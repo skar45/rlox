@@ -1,6 +1,10 @@
+mod errors;
+
 use std::{
-    env, error::Error, fs, io::{self, Write}, process::{self, ExitCode}
+    env, fs, io::{self, Write}, process::{self, ExitCode}
 };
+
+use errors::rlox_errors::{GenericScannerError, InvalidToken, ScannerError, UnterminatedString};
 
 enum TokenType {
     LeftParen,
@@ -94,7 +98,7 @@ impl std::fmt::Display for Token {
 }
 
 struct Scanner {
-    source: String,
+    chars: Vec<char>,
     pub tokens: Vec<Token>,
     start: usize,
     current: usize,
@@ -104,9 +108,9 @@ struct Scanner {
 impl Scanner {
     fn new(source: String) -> Self {
         let mut tokens: Vec<Token> = Vec::new();
-        tokens.reserve(100);
+        tokens.reserve(128);
         Scanner {
-            source,
+            chars: source.chars().collect(),
             tokens,
             start: 0,
             current: 0,
@@ -115,13 +119,10 @@ impl Scanner {
     }
 
 
-    fn scan_tokens(&mut self) -> Result<(), Box<dyn Error>> {
-        let chars = self.source.clone();
-        let mut chars = chars.chars();
+    fn scan_tokens(&mut self) -> Result<(), ScannerError> {
         while !self.is_at_end() {
             self.start = self.current;
-            if let Some(c) = chars.next() {
-                self.current += 1;
+            if let Some(c) = self.advance() {
                 match c {
                     '(' => self.add_token(TokenType::LeftParen),
                     ')' => self.add_token(TokenType::RightParen),
@@ -133,7 +134,55 @@ impl Scanner {
                     '-' => self.add_token(TokenType::Minus),
                     ';' => self.add_token(TokenType::Semicolon),
                     '*' => self.add_token(TokenType::Star),
-                    _ => return Err(Error::description(""))
+                    '!' => {
+                        match self.char_match('=') {
+                            true => self.add_token(TokenType::BangEqual),
+                            false => self.add_token(TokenType::Bang),
+                        };
+                    },
+                    '=' => {
+                        match self.char_match('=') {
+                            true => self.add_token(TokenType::Equal),
+                            false => self.add_token(TokenType::EqualEqual),
+                        };
+                    },
+                    '<' => {
+                        match self.char_match('=') {
+                            true => self.add_token(TokenType::LessEqual),
+                            false => self.add_token(TokenType::Less),
+                        };
+                    },
+                    '>' => {
+                        match self.char_match('=') {
+                            true => self.add_token(TokenType::GreaterEqual),
+                            false => self.add_token(TokenType::Greater),
+                        };
+                    },
+                    '/' => {
+                        match self.char_match('/') {
+                            true =>  {
+                                while self.peek() != '\n' && !self.is_at_end() { self.current += 1 };
+                            },
+                            false => {
+                                match self.char_match('*') {
+                                    true =>  {
+                                        while self.char_match('\n') { self.current += 1 };
+                                    },
+                                    false => self.add_token(TokenType::Slash),
+                                };
+                            },
+                        };
+                    },
+                    '"' => {
+                        if let Err(e) = self.process_string_literal() {
+                            return Err(e)
+                        };
+                    },
+                    '\t' | '\r' | ' ' => continue,
+                    d => {
+                        let token = d.clone();
+                        return Err(self.invalid_token(&token));
+                    }
                 }
             }
         }
@@ -145,14 +194,52 @@ impl Scanner {
     fn is_at_end(&self) -> bool {
         self.current
             >= self
-                .source
+                .chars
                 .len()
-                .try_into()
-                .expect("usize to u32 casting error")
+    }
+
+    fn peek(&self) -> char {
+        if let Some(c) = self.chars.get(self.current) { *c } else { '\0' }
+    }
+
+    fn char_match(&mut self, comp: char) -> bool { 
+            if let Some(c) = self.chars.get(self.current) {
+                if *c == comp {
+                    self.current += 1;
+                    return true
+                } else {
+                    return false
+                }
+            }
+            false
+    }
+
+    fn process_string_literal(&mut self) -> Result<String, UnterminatedString> {
+        while self.peek() != '"' && !self.is_at_end(){
+            if self.peek() == '\n' { self.line += 1 };
+            self.advance();
+        };
+
+        if self.is_at_end() { return Err(self.unterminated_string()) };
+        Ok("".to_string())
+    }
+
+    fn invalid_token(&self, token: &char) -> InvalidToken {
+        InvalidToken::new(self.line, 0, token.to_string())
+    }
+
+    fn unterminated_string(&self) -> UnterminatedString {
+        UnterminatedString::new(self.line, 0)
+    }
+
+    fn advance(&mut self) -> Option<&char> {
+        let c = self.chars.get(self.current);
+        self.current += 1;
+        return c;
     }
 
     fn add_token(&mut self, r#type: TokenType) {
-        let lexme = self.source[self.start..self.current].to_string();
+        let lexme = self.chars[self.start..self.current].into_iter().collect();
         self.tokens.push(Token {
             r#type,
             lexme,
@@ -160,7 +247,6 @@ impl Scanner {
             line: self.line
         });
     }
-
 }
 
 
@@ -173,9 +259,21 @@ impl Rlox {
         Rlox { had_error: false }
     }
 
-    fn run(source: String) {
+    fn run(&mut self, source: String) {
         let mut scanner = Scanner::new(source);
-        scanner.scan_tokens();
+        if let Err(e) = scanner.scan_tokens() {
+            match e {
+                ScannerError::InvalidToken(e) => {
+                    let line = e.get_line();
+                    let token = e.get_token();
+                    self.report_error(line, Some(token));
+                }, 
+                ScannerError::UnterminatedString(e) => {
+                    let line = 1;
+                    self.report_error(line, None);
+                }
+            }
+        }
 
         for token in scanner.tokens.iter() {
             println!("{}", token);
@@ -192,15 +290,15 @@ impl Rlox {
             io::stdin()
                 .read_line(&mut input)
                 .expect("Unable to parse from stdin!");
-            Rlox::run(input.clone());
+            self.run(input.clone());
             self.had_error = false;
         }
     }
 
-    fn run_file(&self, path: String) {
+    fn run_file(&mut self, path: String) {
         let content = fs::read_to_string(path);
         match content {
-            Ok(s) => Rlox::run(s),
+            Ok(s) => self.run(s),
             Err(e) => eprintln!("Error reading file: {}", e),
         }
 
@@ -210,8 +308,8 @@ impl Rlox {
     }
 
 
-    fn error(&mut self, line: i32, message: String) {
-        println!("[line \"{}\"] Error: {}", line, message);
+    fn report_error(&mut self, line: usize, message: Option<&str>) {
+        println!("[line \"{}\"] Error: {}", line, message.unwrap_or(""));
         self.had_error = true;
     }
 
