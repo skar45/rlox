@@ -180,14 +180,18 @@ impl Scanner {
                             }
                         };
                     }
-                    '"' => {
-                        self.process_string_literal()?
-                    }
+                    '\n' => self.line += 1,
                     '\t' | '\r' | ' ' => continue,
-
+                    '"' => self.process_string_literal()?,
                     d => {
-                        let token = d.clone();
-                        return Err(self.invalid_token(&token).into());
+                        if Scanner::char_is_num(d) {
+                            self.process_number_literal()?
+                        } else if Scanner::char_is_alpha(d) {
+                            self.process_identifier()?
+                        } else {
+                            let token = d.clone();
+                            return Err(self.invalid_token(&token).into());
+                        }
                     }
                 }
             }
@@ -209,6 +213,14 @@ impl Scanner {
         }
     }
 
+    fn peek_next(&self) -> char {
+        if let Some(c) = self.chars.get(self.current + 1) {
+            *c
+        } else {
+            '\0'
+        }
+    }
+
     fn char_match(&mut self, comp: char) -> bool {
         if let Some(c) = self.chars.get(self.current) {
             if *c == comp {
@@ -219,6 +231,18 @@ impl Scanner {
             }
         }
         false
+    }
+
+    fn char_is_num(comp: &char) -> bool {
+        (*comp >= '0') && (*comp <= '9')
+    }
+
+    fn char_is_alpha(comp: &char) -> bool {
+        (*comp >= 'a' && *comp <= 'z') || (*comp >= 'A' && *comp <= 'Z') || (*comp == '_')
+    }
+
+    fn char_is_alphanum(comp: &char) -> bool {
+        Scanner::char_is_num(comp) || Scanner::char_is_alpha(comp)
     }
 
     fn process_string_literal(&mut self) -> Result<(), UnterminatedString> {
@@ -235,8 +259,60 @@ impl Scanner {
 
         self.advance();
 
-        let value: String = self.chars[self.start + 1 .. self.current - 1].iter().collect();
+        let value: String = self.chars[self.start + 1..self.current - 1]
+            .iter()
+            .collect();
         self.add_token_literal(TokenType::String, LiteralType::String(value));
+        Ok(())
+    }
+
+    fn process_number_literal(&mut self) -> Result<(), InvalidToken> {
+        while Scanner::char_is_num(&self.peek()) {
+            self.advance();
+        }
+        if self.peek_next() == '.' {
+            self.advance();
+            while Scanner::char_is_num(&self.peek()) {
+                self.advance();
+            }
+        }
+
+        let value = self.chars[self.start..self.current]
+            .iter()
+            .collect::<String>()
+            .parse::<f64>();
+        match value {
+            Ok(v) => self.add_token_literal(TokenType::Number, LiteralType::Number(v)),
+            Err(_) => return Err(self.invalid_token(&self.chars[self.start])),
+        }
+        Ok(())
+    }
+
+    fn process_identifier(&mut self) -> Result<(), InvalidToken> {
+        while Scanner::char_is_alphanum(&self.peek()) {
+            self.advance();
+        }
+        let value: String = self.chars[self.start..self.current].iter().collect();
+        let token = match value.as_str() {
+            "and" => TokenType::And,
+            "class" => TokenType::Class,
+            "else" => TokenType::Else,
+            "false" => TokenType::False,
+            "for" => TokenType::For,
+            "if" => TokenType::If,
+            "nil" => TokenType::Nil,
+            "or" => TokenType::Or,
+            "print" => TokenType::Print,
+            "return" => TokenType::Return,
+            "super" => TokenType::Super,
+            "this" => TokenType::This,
+            "true" => TokenType::True,
+            "var" => TokenType::Var,
+            "while" => TokenType::While,
+            "fun" => TokenType::Fun,
+            _ => TokenType::Identifier,
+        };
+        self.add_token(token);
         Ok(())
     }
 

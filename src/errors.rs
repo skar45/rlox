@@ -5,7 +5,7 @@ pub mod rlox_errors {
     pub struct InvalidToken {
         token: String,
         line: usize,
-        column: usize
+        column: usize,
     }
 
     impl InvalidToken {
@@ -13,7 +13,7 @@ pub mod rlox_errors {
             InvalidToken {
                 token,
                 line,
-                column
+                column,
             }
         }
 
@@ -47,15 +47,12 @@ pub mod rlox_errors {
     #[derive(Debug)]
     pub struct UnterminatedString {
         line: usize,
-        column: usize
+        column: usize,
     }
 
     impl UnterminatedString {
         pub fn new(line: usize, column: usize) -> Self {
-            UnterminatedString {
-                line,
-                column
-            }
+            UnterminatedString { line, column }
         }
 
         pub fn get_column(&self) -> usize {
