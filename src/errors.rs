@@ -2,12 +2,25 @@ pub mod rlox_errors {
     use std::{error::Error, fmt::Display};
 
     #[derive(Debug)]
-    pub struct GenericScannerError {
+    pub struct InvalidToken {
+        token: String,
         line: usize,
         column: usize
     }
 
-    impl GenericScannerError {
+    impl InvalidToken {
+        pub fn new(line: usize, column: usize, token: String) -> Self {
+            InvalidToken {
+                token,
+                line,
+                column
+            }
+        }
+
+        pub fn get_token(&self) -> &str {
+            &self.token
+        }
+
         pub fn get_column(&self) -> usize {
             self.column
         }
@@ -17,49 +30,11 @@ pub mod rlox_errors {
         }
     }
 
-    impl Error for GenericScannerError {}
+    impl Error for InvalidToken {}
 
-    impl Display for GenericScannerError {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "scanner error")
-        }
-    }
-
-    #[derive(Debug)]
-    pub struct InvalidToken {
-        token: String,
-        source: GenericScannerError
-    }
-
-    impl InvalidToken {
-        pub fn new(line: usize, column: usize, token: String) -> Self {
-            InvalidToken {
-                token,
-                source: GenericScannerError {
-                    line,
-                    column
-                }
-            }
-        }
-
-        pub fn get_token(&self) -> &str {
-            &self.token
-        }
-
-        pub fn get_column(&self) -> usize {
-            self.source.get_column()
-        }
-
-        pub fn get_line(&self) -> usize {
-            self.source.get_line()
-        }
-
-    }
-
-
-    impl Error for InvalidToken {
-        fn source(&self) -> Option<&(dyn Error + 'static)> {
-            Some(&self.source)
+    impl From<InvalidToken> for ScannerError {
+        fn from(value: InvalidToken) -> Self {
+            ScannerError::TokenError(value)
         }
     }
 
@@ -71,23 +46,32 @@ pub mod rlox_errors {
 
     #[derive(Debug)]
     pub struct UnterminatedString {
-        source: GenericScannerError
+        line: usize,
+        column: usize
     }
 
     impl UnterminatedString {
         pub fn new(line: usize, column: usize) -> Self {
             UnterminatedString {
-                source: GenericScannerError {
-                    line,
-                    column
-                }
+                line,
+                column
             }
+        }
+
+        pub fn get_column(&self) -> usize {
+            self.column
+        }
+
+        pub fn get_line(&self) -> usize {
+            self.line
         }
     }
 
-    impl Error for UnterminatedString {
-        fn source(&self) -> Option<&(dyn Error + 'static)> {
-            Some(&self.source)
+    impl Error for UnterminatedString {}
+
+    impl From<UnterminatedString> for ScannerError {
+        fn from(value: UnterminatedString) -> Self {
+            ScannerError::StringError(value)
         }
     }
 
@@ -98,7 +82,7 @@ pub mod rlox_errors {
     }
 
     pub enum ScannerError {
-        InvalidToken(InvalidToken),
-        UnterminatedString(UnterminatedString)
+        TokenError(InvalidToken),
+        StringError(UnterminatedString),
     }
 }

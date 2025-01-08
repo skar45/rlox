@@ -1,10 +1,14 @@
 mod errors;
 
 use std::{
-    env, fs, io::{self, Write}, process::{self, ExitCode}
+    env, fs,
+    io::{self, Write},
+    process::{self, ExitCode},
 };
 
-use errors::rlox_errors::{GenericScannerError, InvalidToken, ScannerError, UnterminatedString};
+use errors::rlox_errors::{InvalidToken, UnterminatedString};
+
+use crate::errors::rlox_errors::ScannerError;
 
 enum TokenType {
     LeftParen,
@@ -55,8 +59,8 @@ impl std::fmt::Display for TokenType {
 }
 
 enum LiteralType {
-    String,
-    Number,
+    String(String),
+    Number(f64),
 }
 
 impl std::fmt::Display for LiteralType {
@@ -118,7 +122,6 @@ impl Scanner {
         }
     }
 
-
     fn scan_tokens(&mut self) -> Result<(), ScannerError> {
         while !self.is_at_end() {
             self.start = self.current;
@@ -139,49 +142,52 @@ impl Scanner {
                             true => self.add_token(TokenType::BangEqual),
                             false => self.add_token(TokenType::Bang),
                         };
-                    },
+                    }
                     '=' => {
                         match self.char_match('=') {
                             true => self.add_token(TokenType::Equal),
                             false => self.add_token(TokenType::EqualEqual),
                         };
-                    },
+                    }
                     '<' => {
                         match self.char_match('=') {
                             true => self.add_token(TokenType::LessEqual),
                             false => self.add_token(TokenType::Less),
                         };
-                    },
+                    }
                     '>' => {
                         match self.char_match('=') {
                             true => self.add_token(TokenType::GreaterEqual),
                             false => self.add_token(TokenType::Greater),
                         };
-                    },
+                    }
                     '/' => {
                         match self.char_match('/') {
-                            true =>  {
-                                while self.peek() != '\n' && !self.is_at_end() { self.current += 1 };
-                            },
+                            true => {
+                                while self.peek() != '\n' && !self.is_at_end() {
+                                    self.current += 1
+                                }
+                            }
                             false => {
                                 match self.char_match('*') {
-                                    true =>  {
-                                        while self.char_match('\n') { self.current += 1 };
-                                    },
+                                    true => {
+                                        while self.char_match('\n') {
+                                            self.current += 1
+                                        }
+                                    }
                                     false => self.add_token(TokenType::Slash),
                                 };
-                            },
+                            }
                         };
-                    },
+                    }
                     '"' => {
-                        if let Err(e) = self.process_string_literal() {
-                            return Err(e)
-                        };
-                    },
+                        self.process_string_literal()?
+                    }
                     '\t' | '\r' | ' ' => continue,
+
                     d => {
                         let token = d.clone();
-                        return Err(self.invalid_token(&token));
+                        return Err(self.invalid_token(&token).into());
                     }
                 }
             }
@@ -192,36 +198,46 @@ impl Scanner {
     }
 
     fn is_at_end(&self) -> bool {
-        self.current
-            >= self
-                .chars
-                .len()
+        self.current >= self.chars.len()
     }
 
     fn peek(&self) -> char {
-        if let Some(c) = self.chars.get(self.current) { *c } else { '\0' }
+        if let Some(c) = self.chars.get(self.current) {
+            *c
+        } else {
+            '\0'
+        }
     }
 
-    fn char_match(&mut self, comp: char) -> bool { 
-            if let Some(c) = self.chars.get(self.current) {
-                if *c == comp {
-                    self.current += 1;
-                    return true
-                } else {
-                    return false
-                }
+    fn char_match(&mut self, comp: char) -> bool {
+        if let Some(c) = self.chars.get(self.current) {
+            if *c == comp {
+                self.current += 1;
+                return true;
+            } else {
+                return false;
             }
-            false
+        }
+        false
     }
 
-    fn process_string_literal(&mut self) -> Result<String, UnterminatedString> {
-        while self.peek() != '"' && !self.is_at_end(){
-            if self.peek() == '\n' { self.line += 1 };
+    fn process_string_literal(&mut self) -> Result<(), UnterminatedString> {
+        while self.peek() != '"' && !self.is_at_end() {
+            if self.peek() == '\n' {
+                self.line += 1
+            };
             self.advance();
+        }
+
+        if self.is_at_end() {
+            return Err(self.unterminated_string());
         };
 
-        if self.is_at_end() { return Err(self.unterminated_string()) };
-        Ok("".to_string())
+        self.advance();
+
+        let value: String = self.chars[self.start + 1 .. self.current - 1].iter().collect();
+        self.add_token_literal(TokenType::String, LiteralType::String(value));
+        Ok(())
     }
 
     fn invalid_token(&self, token: &char) -> InvalidToken {
@@ -244,18 +260,27 @@ impl Scanner {
             r#type,
             lexme,
             literal: None,
-            line: self.line
+            line: self.line,
+        });
+    }
+
+    fn add_token_literal(&mut self, r#type: TokenType, literal: LiteralType) {
+        let lexme = self.chars[self.start..self.current].into_iter().collect();
+        self.tokens.push(Token {
+            r#type,
+            lexme,
+            literal: Some(literal),
+            line: self.line,
         });
     }
 }
 
-
 struct Rlox {
-    had_error: bool
+    had_error: bool,
 }
 
 impl Rlox {
-    fn new () -> Self {
+    fn new() -> Self {
         Rlox { had_error: false }
     }
 
@@ -263,13 +288,13 @@ impl Rlox {
         let mut scanner = Scanner::new(source);
         if let Err(e) = scanner.scan_tokens() {
             match e {
-                ScannerError::InvalidToken(e) => {
+                ScannerError::TokenError(e) => {
                     let line = e.get_line();
                     let token = e.get_token();
                     self.report_error(line, Some(token));
-                }, 
-                ScannerError::UnterminatedString(e) => {
-                    let line = 1;
+                }
+                ScannerError::StringError(e) => {
+                    let line = e.get_line();
                     self.report_error(line, None);
                 }
             }
@@ -307,17 +332,15 @@ impl Rlox {
         }
     }
 
-
     fn report_error(&mut self, line: usize, message: Option<&str>) {
         println!("[line \"{}\"] Error: {}", line, message.unwrap_or(""));
         self.had_error = true;
     }
-
 }
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
-    let mut rlox = Rlox::new(); 
+    let mut rlox = Rlox::new();
     match args.len() {
         1 => rlox.run_prompt(),
         2 => rlox.run_file(args[1].clone()),
