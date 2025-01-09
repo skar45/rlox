@@ -210,7 +210,7 @@ impl Scanner {
 
     fn increment_current(&mut self, value: usize) {
         self.current += value;
-        self.column += 1;
+        self.column += value;
     }
 
     fn is_at_end(&self) -> bool {
@@ -258,18 +258,22 @@ impl Scanner {
     }
 
     fn process_string_literal(&mut self) -> Result<(), UnterminatedString> {
+        // store column in case the source ends in new line
+        let mut prev_column = self.column;
         while self.peek() != '"' && !self.is_at_end() {
             if self.peek() == '\n' {
+                prev_column = self.column;
                 self.increment_line();
             };
-            self.advance();
+            self.increment_current(1);
         }
 
         if self.is_at_end() {
+            self.column = prev_column;
             return Err(self.unterminated_string());
         };
 
-        self.advance();
+        self.increment_current(1);
 
         let value: String = self.chars[self.start + 1..self.current - 1]
             .iter()
@@ -329,12 +333,13 @@ impl Scanner {
     }
 
     fn process_block_comments(&mut self) -> Result<(), UnterminatedComment> {
+        // store column in case the source ends in new line
+        let mut prev_column = self.column;
         let mut nested = 1;
-        // accounting for /*
-        self.increment_current(2);
         while (nested != 0) && !self.is_at_end() { 
             match self.peek() {
                 '\n' => {
+                    prev_column = self.column;
                     self.increment_line();
                     self.increment_current(1);
                 }
@@ -359,6 +364,7 @@ impl Scanner {
         };
 
         if nested > 0 {
+            self.column = prev_column;
             Err(self.unterminated_comment())
         } else {
             Ok(())
@@ -366,18 +372,21 @@ impl Scanner {
     }
 
     fn invalid_token(&self, token: &char) -> InvalidToken {
-        let line_text = Some(self.chars[self.start..self.current].iter().collect());
-        InvalidToken::new(self.line, self.column, token.to_string(), line_text)
+        InvalidToken::new(self.line, self.column, token.to_string(), Some(self.get_line_text()))
     }
 
     fn unterminated_string(&self) -> UnterminatedString {
-        let line_text = Some(self.chars[self.start..self.current].iter().collect());
-        UnterminatedString::new(self.line, self.column, line_text)
+        UnterminatedString::new(self.line, self.column, Some(self.get_line_text()))
     }
 
     fn unterminated_comment(&self) -> UnterminatedComment {
-        let line_text = Some(self.chars[self.start..self.current].iter().collect());
-        UnterminatedComment::new(self.line, self.column, line_text)
+        UnterminatedComment::new(self.line, self.column, Some(self.get_line_text()))
+    }
+
+    fn get_line_text(&self) -> String {
+        println!("start: {} column: {} line: {} current: {}", self.start, self.column, self.line, self.current);
+        let start_index = if self.line > 1 { self.current - self.column - 1 } else { 0 };
+        self.chars[start_index..self.current].iter().collect()
     }
 
     fn advance(&mut self) -> Option<&char> {
@@ -477,14 +486,20 @@ impl Rlox {
 
     fn report_error(&mut self, line: usize, column: usize, line_text: Option<&str>, message: &str) {
         if let Some(text) = line_text {
+            // align the text with padding
+            let l_pad = if line > 9 {"    "} else {"   "};
             let mut offset = "".to_string();
             for _ in 2..column {
                 offset.push(' ');
             }
+            let text_lines: Vec<&str>  = text.lines().collect();
             eprintln!("Error: {}", message);
-            println!("   |");
-            println!("{}  | {}", line, text);
-            println!("   | {}^^", offset);
+            println!("{}|", l_pad);
+            for i in 1..=text_lines.len() {
+                println!("{}  | {}", (line - text_lines.len()) + i, text_lines[i-1]);
+            }
+            println!("{}| {}^^", l_pad, offset);
+            println!("column: {} line: {}", column, line);
         }
         self.had_error = true;
     }
@@ -497,7 +512,7 @@ fn main() -> ExitCode {
         1 => rlox.run_prompt(),
         2 => rlox.run_file(args[1].clone()),
         _ => {
-            println!("usage: ./rlox [*.rlox]");
+            println!("usage: ./rlox [file]");
             return ExitCode::FAILURE;
         }
     }
