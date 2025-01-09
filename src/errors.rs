@@ -6,14 +6,16 @@ pub mod rlox_errors {
         token: String,
         line: usize,
         column: usize,
+        line_text: Option<String>
     }
 
     impl InvalidToken {
-        pub fn new(line: usize, column: usize, token: String) -> Self {
+        pub fn new(line: usize, column: usize, token: String, line_text: Option<String>) -> Self {
             InvalidToken {
                 token,
                 line,
                 column,
+                line_text
             }
         }
 
@@ -27,6 +29,10 @@ pub mod rlox_errors {
 
         pub fn get_line(&self) -> usize {
             self.line
+        }
+
+        pub fn get_line_text(&self) -> Option<&str> {
+            self.line_text.as_deref()
         }
     }
 
@@ -48,11 +54,12 @@ pub mod rlox_errors {
     pub struct UnterminatedString {
         line: usize,
         column: usize,
+        line_text: Option<String>
     }
 
     impl UnterminatedString {
-        pub fn new(line: usize, column: usize) -> Self {
-            UnterminatedString { line, column }
+        pub fn new(line: usize, column: usize, line_text: Option<String>) -> Self {
+            UnterminatedString { line, column, line_text }
         }
 
         pub fn get_column(&self) -> usize {
@@ -61,6 +68,10 @@ pub mod rlox_errors {
 
         pub fn get_line(&self) -> usize {
             self.line
+        }
+
+        pub fn get_line_text(&self) -> Option<&str> {
+            self.line_text.as_deref()
         }
     }
 
@@ -78,8 +89,48 @@ pub mod rlox_errors {
         }
     }
 
+    #[derive(Debug)]
+    pub struct UnterminatedComment {
+        line: usize,
+        column: usize,
+        line_text: Option<String>
+    }
+
+    impl UnterminatedComment {
+        pub fn new(line: usize, column: usize, line_text: Option<String>) -> Self {
+            UnterminatedComment { line, column, line_text }
+        }
+
+        pub fn get_column(&self) -> usize {
+            self.column
+        }
+
+        pub fn get_line(&self) -> usize {
+            self.line
+        }
+
+        pub fn get_line_text(&self) -> Option<&str> {
+            self.line_text.as_deref()
+        }
+    }
+
+    impl Error for UnterminatedComment {}
+
+    impl From<UnterminatedComment> for ScannerError {
+        fn from(value: UnterminatedComment) -> Self {
+            ScannerError::CommentError(value)
+        }
+    }
+
+    impl Display for UnterminatedComment {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "unterminated comment block")
+        }
+    }
+
     pub enum ScannerError {
         TokenError(InvalidToken),
         StringError(UnterminatedString),
+        CommentError(UnterminatedComment)
     }
 }

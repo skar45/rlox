@@ -6,10 +6,11 @@ use std::{
     process::{self, ExitCode},
 };
 
-use errors::rlox_errors::{InvalidToken, UnterminatedString};
+use errors::rlox_errors::{InvalidToken, UnterminatedComment, UnterminatedString};
 
 use crate::errors::rlox_errors::ScannerError;
 
+#[derive(Debug)]
 enum TokenType {
     LeftParen,
     RightParen,
@@ -58,14 +59,18 @@ impl std::fmt::Display for TokenType {
     }
 }
 
+#[derive(Debug)]
 enum LiteralType {
-    String(String),
-    Number(f64),
+    Str(String),
+    Num(f64),
 }
 
 impl std::fmt::Display for LiteralType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_string())
+        match self {
+            LiteralType::Str(v) => write!(f, "{}", v),
+            LiteralType::Num(v) => write!(f, "{}", v),
+        }
     }
 }
 
@@ -73,24 +78,24 @@ struct Token {
     r#type: TokenType,
     lexme: String,
     literal: Option<LiteralType>,
-    line: usize,
+    // line: usize,
 }
 
 impl Token {
-    fn eof_token(line: usize) -> Self {
+    fn eof_token() -> Self {
         Token {
             r#type: TokenType::Eof,
             lexme: "".to_string(),
             literal: None,
-            line,
+            // line,
         }
     }
 
     fn to_string(&self) -> String {
         if let Some(literal) = &self.literal {
-            return format!("{} {} {}", self.r#type, self.lexme, literal);
+            return format!("{:?} {} {:?}", self.r#type, self.lexme, literal);
         } else {
-            return format!("{} {}", self.r#type, self.lexme);
+            return format!("{:?} {}", self.r#type, self.lexme);
         }
     }
 }
@@ -107,6 +112,7 @@ struct Scanner {
     start: usize,
     current: usize,
     line: usize,
+    column: usize
 }
 
 impl Scanner {
@@ -119,6 +125,7 @@ impl Scanner {
             start: 0,
             current: 0,
             line: 0,
+            column: 0
         }
     }
 
@@ -165,22 +172,18 @@ impl Scanner {
                         match self.char_match('/') {
                             true => {
                                 while self.peek() != '\n' && !self.is_at_end() {
-                                    self.current += 1
+                                    self.increment_current(1);
                                 }
                             }
                             false => {
                                 match self.char_match('*') {
-                                    true => {
-                                        while self.char_match('\n') {
-                                            self.current += 1
-                                        }
-                                    }
+                                    true => self.process_block_comments()?,
                                     false => self.add_token(TokenType::Slash),
                                 };
                             }
                         };
                     }
-                    '\n' => self.line += 1,
+                    '\n' => self.increment_line(),
                     '\t' | '\r' | ' ' => continue,
                     '"' => self.process_string_literal()?,
                     d => {
@@ -196,9 +199,18 @@ impl Scanner {
                 }
             }
         }
-
-        self.tokens.push(Token::eof_token(self.line));
+        self.tokens.push(Token::eof_token());
         Ok(())
+    }
+
+    fn increment_line(&mut self) {
+        self.line += 1;
+        self.column = 0;
+    }
+
+    fn increment_current(&mut self, value: usize) {
+        self.current += value;
+        self.column += 1;
     }
 
     fn is_at_end(&self) -> bool {
@@ -224,7 +236,7 @@ impl Scanner {
     fn char_match(&mut self, comp: char) -> bool {
         if let Some(c) = self.chars.get(self.current) {
             if *c == comp {
-                self.current += 1;
+                self.increment_current(1);
                 return true;
             } else {
                 return false;
@@ -248,7 +260,7 @@ impl Scanner {
     fn process_string_literal(&mut self) -> Result<(), UnterminatedString> {
         while self.peek() != '"' && !self.is_at_end() {
             if self.peek() == '\n' {
-                self.line += 1
+                self.increment_line();
             };
             self.advance();
         }
@@ -262,7 +274,7 @@ impl Scanner {
         let value: String = self.chars[self.start + 1..self.current - 1]
             .iter()
             .collect();
-        self.add_token_literal(TokenType::String, LiteralType::String(value));
+        self.add_token_literal(TokenType::String, LiteralType::Str(value));
         Ok(())
     }
 
@@ -282,7 +294,7 @@ impl Scanner {
             .collect::<String>()
             .parse::<f64>();
         match value {
-            Ok(v) => self.add_token_literal(TokenType::Number, LiteralType::Number(v)),
+            Ok(v) => self.add_token_literal(TokenType::Number, LiteralType::Num(v)),
             Err(_) => return Err(self.invalid_token(&self.chars[self.start])),
         }
         Ok(())
@@ -316,16 +328,61 @@ impl Scanner {
         Ok(())
     }
 
+    fn process_block_comments(&mut self) -> Result<(), UnterminatedComment> {
+        let mut nested = 1;
+        // accounting for /*
+        self.increment_current(2);
+        while (nested != 0) && !self.is_at_end() { 
+            match self.peek() {
+                '\n' => {
+                    self.increment_line();
+                    self.increment_current(1);
+                }
+                '*' => {
+                    if self.peek_next() == '/' {
+                        nested -= 1;
+                        self.increment_current(2);
+                    } else {
+                        self.increment_current(1);
+                    };
+                },
+                '/' => {
+                    if self.peek_next() == '*' {
+                        nested += 1;
+                        self.increment_current(2);
+                    } else {
+                        self.increment_current(1);
+                    };
+                },
+                _ => self.increment_current(1),
+            };
+        };
+
+        if nested > 0 {
+            Err(self.unterminated_comment())
+        } else {
+            Ok(())
+        }
+    }
+
     fn invalid_token(&self, token: &char) -> InvalidToken {
-        InvalidToken::new(self.line, 0, token.to_string())
+        let line_text = Some(self.chars[self.start..self.current].iter().collect());
+        InvalidToken::new(self.line, self.column, token.to_string(), line_text)
     }
 
     fn unterminated_string(&self) -> UnterminatedString {
-        UnterminatedString::new(self.line, 0)
+        let line_text = Some(self.chars[self.start..self.current].iter().collect());
+        UnterminatedString::new(self.line, self.column, line_text)
+    }
+
+    fn unterminated_comment(&self) -> UnterminatedComment {
+        let line_text = Some(self.chars[self.start..self.current].iter().collect());
+        UnterminatedComment::new(self.line, self.column, line_text)
     }
 
     fn advance(&mut self) -> Option<&char> {
         let c = self.chars.get(self.current);
+        self.column += 1;
         self.current += 1;
         return c;
     }
@@ -335,8 +392,7 @@ impl Scanner {
         self.tokens.push(Token {
             r#type,
             lexme,
-            literal: None,
-            line: self.line,
+            literal: None
         });
     }
 
@@ -345,8 +401,7 @@ impl Scanner {
         self.tokens.push(Token {
             r#type,
             lexme,
-            literal: Some(literal),
-            line: self.line,
+            literal: Some(literal)
         });
     }
 }
@@ -366,24 +421,36 @@ impl Rlox {
             match e {
                 ScannerError::TokenError(e) => {
                     let line = e.get_line();
+                    let column = e.get_column();
                     let token = e.get_token();
-                    self.report_error(line, Some(token));
+                    let line_text = e.get_line_text();
+                    let message = format!("invalid token {}", token);
+                    self.report_error(line, column, line_text, &message);
                 }
                 ScannerError::StringError(e) => {
                     let line = e.get_line();
-                    self.report_error(line, None);
+                    let column = e.get_column();
+                    let line_text = e.get_line_text();
+                    let message = format!("{}", e.to_string());
+                    self.report_error(line, column, line_text, &message);
+                }
+                ScannerError::CommentError(e) => {
+                    let line = e.get_line();
+                    let column = e.get_column();
+                    let line_text = e.get_line_text();
+                    let message = format!("{}", e.to_string());
+                    self.report_error(line, column, line_text, &message);
                 }
             }
         }
-
         for token in scanner.tokens.iter() {
-            println!("{}", token);
+            println!("token {}", token.to_string());
         }
     }
 
     fn run_prompt(&mut self) {
-        let mut input = String::new();
         loop {
+            let mut input = String::new();
             io::stdout()
                 .write_all(b"> ")
                 .expect("Unable to write to stdout!");
@@ -391,7 +458,7 @@ impl Rlox {
             io::stdin()
                 .read_line(&mut input)
                 .expect("Unable to parse from stdin!");
-            self.run(input.clone());
+            self.run(input);
             self.had_error = false;
         }
     }
@@ -408,8 +475,17 @@ impl Rlox {
         }
     }
 
-    fn report_error(&mut self, line: usize, message: Option<&str>) {
-        println!("[line \"{}\"] Error: {}", line, message.unwrap_or(""));
+    fn report_error(&mut self, line: usize, column: usize, line_text: Option<&str>, message: &str) {
+        if let Some(text) = line_text {
+            let mut offset = "".to_string();
+            for _ in 2..column {
+                offset.push(' ');
+            }
+            eprintln!("Error: {}", message);
+            println!("   |");
+            println!("{}  | {}", line, text);
+            println!("   | {}^^", offset);
+        }
         self.had_error = true;
     }
 }
@@ -420,7 +496,10 @@ fn main() -> ExitCode {
     match args.len() {
         1 => rlox.run_prompt(),
         2 => rlox.run_file(args[1].clone()),
-        _ => return ExitCode::FAILURE,
+        _ => {
+            println!("usage: ./rlox [*.rlox]");
+            return ExitCode::FAILURE;
+        }
     }
 
     return ExitCode::SUCCESS;
