@@ -193,6 +193,7 @@ impl Scanner {
                             self.process_identifier()?
                         } else {
                             let token = d.clone();
+                            self.line += 1;
                             return Err(self.invalid_token(&token).into());
                         }
                     }
