@@ -6,7 +6,7 @@ pub mod rlox_errors {
         token: String,
         line: usize,
         column: usize,
-        line_text: Option<String>
+        line_text: Option<String>,
     }
 
     impl InvalidToken {
@@ -15,7 +15,7 @@ pub mod rlox_errors {
                 token,
                 line,
                 column,
-                line_text
+                line_text,
             }
         }
 
@@ -54,12 +54,16 @@ pub mod rlox_errors {
     pub struct UnterminatedString {
         line: usize,
         column: usize,
-        line_text: Option<String>
+        line_text: Option<String>,
     }
 
     impl UnterminatedString {
         pub fn new(line: usize, column: usize, line_text: Option<String>) -> Self {
-            UnterminatedString { line, column, line_text }
+            UnterminatedString {
+                line,
+                column,
+                line_text,
+            }
         }
 
         pub fn get_column(&self) -> usize {
@@ -93,12 +97,16 @@ pub mod rlox_errors {
     pub struct UnterminatedComment {
         line: usize,
         column: usize,
-        line_text: Option<String>
+        line_text: Option<String>,
     }
 
     impl UnterminatedComment {
         pub fn new(line: usize, column: usize, line_text: Option<String>) -> Self {
-            UnterminatedComment { line, column, line_text }
+            UnterminatedComment {
+                line,
+                column,
+                line_text,
+            }
         }
 
         pub fn get_column(&self) -> usize {
@@ -131,6 +139,6 @@ pub mod rlox_errors {
     pub enum ScannerError {
         TokenError(InvalidToken),
         StringError(UnterminatedString),
-        CommentError(UnterminatedComment)
+        CommentError(UnterminatedComment),
     }
 }

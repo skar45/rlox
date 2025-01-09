@@ -112,7 +112,7 @@ struct Scanner {
     start: usize,
     current: usize,
     line: usize,
-    column: usize
+    column: usize,
 }
 
 impl Scanner {
@@ -125,7 +125,7 @@ impl Scanner {
             start: 0,
             current: 0,
             line: 0,
-            column: 0
+            column: 0,
         }
     }
 
@@ -337,7 +337,7 @@ impl Scanner {
         // store column in case the source ends in new line
         let mut prev_column = self.column;
         let mut nested = 1;
-        while (nested != 0) && !self.is_at_end() { 
+        while (nested != 0) && !self.is_at_end() {
             match self.peek() {
                 '\n' => {
                     prev_column = self.column;
@@ -351,7 +351,7 @@ impl Scanner {
                     } else {
                         self.increment_current(1);
                     };
-                },
+                }
                 '/' => {
                     if self.peek_next() == '*' {
                         nested += 1;
@@ -359,10 +359,10 @@ impl Scanner {
                     } else {
                         self.increment_current(1);
                     };
-                },
+                }
                 _ => self.increment_current(1),
             };
-        };
+        }
 
         if nested > 0 {
             self.column = prev_column;
@@ -373,7 +373,12 @@ impl Scanner {
     }
 
     fn invalid_token(&self, token: &char) -> InvalidToken {
-        InvalidToken::new(self.line, self.column, token.to_string(), Some(self.get_line_text()))
+        InvalidToken::new(
+            self.line,
+            self.column,
+            token.to_string(),
+            Some(self.get_line_text()),
+        )
     }
 
     fn unterminated_string(&self) -> UnterminatedString {
@@ -385,8 +390,11 @@ impl Scanner {
     }
 
     fn get_line_text(&self) -> String {
-        println!("start: {} column: {} line: {} current: {}", self.start, self.column, self.line, self.current);
-        let start_index = if self.line > 1 { self.current - self.column - 1 } else { 0 };
+        let start_index = if self.line > 1 {
+            self.current - self.column - 1
+        } else {
+            0
+        };
         self.chars[start_index..self.current].iter().collect()
     }
 
@@ -402,7 +410,7 @@ impl Scanner {
         self.tokens.push(Token {
             r#type,
             lexme,
-            literal: None
+            literal: None,
         });
     }
 
@@ -411,7 +419,7 @@ impl Scanner {
         self.tokens.push(Token {
             r#type,
             lexme,
-            literal: Some(literal)
+            literal: Some(literal),
         });
     }
 }
@@ -452,6 +460,7 @@ impl Rlox {
                     self.report_error(line, column, line_text, &message);
                 }
             }
+            process::exit(0x41);
         }
         for token in scanner.tokens.iter() {
             println!("token {}", token.to_string());
@@ -488,19 +497,18 @@ impl Rlox {
     fn report_error(&mut self, line: usize, column: usize, line_text: Option<&str>, message: &str) {
         if let Some(text) = line_text {
             // align the text with padding
-            let l_pad = if line > 9 {"    "} else {"   "};
+            let l_pad = if line > 9 { "    " } else { "   " };
             let mut offset = "".to_string();
             for _ in 2..column {
                 offset.push(' ');
             }
-            let text_lines: Vec<&str>  = text.lines().collect();
+            let text_lines: Vec<&str> = text.lines().collect();
             eprintln!("Error: {}", message);
             println!("{}|", l_pad);
             for i in 1..=text_lines.len() {
-                println!("{}  | {}", (line - text_lines.len()) + i, text_lines[i-1]);
+                println!("{}  | {}", (line - text_lines.len()) + i, text_lines[i - 1]);
             }
             println!("{}| {}^^", l_pad, offset);
-            println!("column: {} line: {}", column, line);
         }
         self.had_error = true;
     }
