@@ -186,15 +186,16 @@ impl Scanner {
                     '\n' => self.increment_line(),
                     '\t' | '\r' | ' ' => continue,
                     '"' => self.process_string_literal()?,
-                    d => {
-                        if Scanner::char_is_num(d) {
+                    def => {
+                        if Scanner::char_is_num(def) {
                             self.process_number_literal()?
-                        } else if Scanner::char_is_alpha(d) {
+                        } else if Scanner::char_is_alpha(def) {
                             self.process_identifier()?
                         } else {
-                            let token = d.clone();
+                            let token = def.clone();
+                            let error = self.invalid_token(&token);
                             self.line += 1;
-                            return Err(self.invalid_token(&token).into());
+                            return Err(error.into());
                         }
                     }
                 }
@@ -391,7 +392,7 @@ impl Scanner {
 
     fn get_line_text(&self) -> String {
         let start_index = if self.line > 1 {
-            self.current - self.column - 1
+            self.current - self.column
         } else {
             0
         };
@@ -438,26 +439,13 @@ impl Rlox {
         if let Err(e) = scanner.scan_tokens() {
             match e {
                 ScannerError::TokenError(e) => {
-                    let line = e.get_line();
-                    let column = e.get_column();
-                    let token = e.get_token();
-                    let line_text = e.get_line_text();
-                    let message = format!("invalid token {}", token);
-                    self.report_error(line, column, line_text, &message);
+                    self.report_error(e.line, e.column, e.line_text.as_deref(), &e.to_string());
                 }
                 ScannerError::StringError(e) => {
-                    let line = e.get_line();
-                    let column = e.get_column();
-                    let line_text = e.get_line_text();
-                    let message = format!("{}", e.to_string());
-                    self.report_error(line, column, line_text, &message);
+                    self.report_error(e.line, e.column, e.line_text.as_deref(), &e.to_string());
                 }
                 ScannerError::CommentError(e) => {
-                    let line = e.get_line();
-                    let column = e.get_column();
-                    let line_text = e.get_line_text();
-                    let message = format!("{}", e.to_string());
-                    self.report_error(line, column, line_text, &message);
+                    self.report_error(e.line, e.column, e.line_text.as_deref(), &e.to_string());
                 }
             }
             process::exit(0x41);
@@ -496,17 +484,18 @@ impl Rlox {
 
     fn report_error(&mut self, line: usize, column: usize, line_text: Option<&str>, message: &str) {
         if let Some(text) = line_text {
-            // align the text with padding
-            let l_pad = if line > 9 { "    " } else { "   " };
+            let l_pad = "    ";
             let mut offset = "".to_string();
             for _ in 2..column {
                 offset.push(' ');
             }
             let text_lines: Vec<&str> = text.lines().collect();
-            eprintln!("Error: {}", message);
+            eprintln!("\x1b[37;41m Error \x1b[0m: {}", message);
             println!("{}|", l_pad);
             for i in 1..=text_lines.len() {
-                println!("{}  | {}", (line - text_lines.len()) + i, text_lines[i - 1]);
+                let line_num = (line - text_lines.len()) + i;
+                let l_pad = if line_num > 9 { "  " } else { "   " };
+                println!("{}{}| {}", line_num, l_pad, text_lines[i - 1]);
             }
             println!("{}| {}^^", l_pad, offset);
         }

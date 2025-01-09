@@ -3,10 +3,10 @@ pub mod rlox_errors {
 
     #[derive(Debug)]
     pub struct InvalidToken {
-        token: String,
-        line: usize,
-        column: usize,
-        line_text: Option<String>,
+        pub token: String,
+        pub line: usize,
+        pub column: usize,
+        pub line_text: Option<String>,
     }
 
     impl InvalidToken {
@@ -17,22 +17,6 @@ pub mod rlox_errors {
                 column,
                 line_text,
             }
-        }
-
-        pub fn get_token(&self) -> &str {
-            &self.token
-        }
-
-        pub fn get_column(&self) -> usize {
-            self.column
-        }
-
-        pub fn get_line(&self) -> usize {
-            self.line
-        }
-
-        pub fn get_line_text(&self) -> Option<&str> {
-            self.line_text.as_deref()
         }
     }
 
@@ -52,9 +36,9 @@ pub mod rlox_errors {
 
     #[derive(Debug)]
     pub struct UnterminatedString {
-        line: usize,
-        column: usize,
-        line_text: Option<String>,
+        pub line: usize,
+        pub column: usize,
+        pub line_text: Option<String>,
     }
 
     impl UnterminatedString {
@@ -64,18 +48,6 @@ pub mod rlox_errors {
                 column,
                 line_text,
             }
-        }
-
-        pub fn get_column(&self) -> usize {
-            self.column
-        }
-
-        pub fn get_line(&self) -> usize {
-            self.line
-        }
-
-        pub fn get_line_text(&self) -> Option<&str> {
-            self.line_text.as_deref()
         }
     }
 
@@ -95,9 +67,9 @@ pub mod rlox_errors {
 
     #[derive(Debug)]
     pub struct UnterminatedComment {
-        line: usize,
-        column: usize,
-        line_text: Option<String>,
+        pub line: usize,
+        pub column: usize,
+        pub line_text: Option<String>,
     }
 
     impl UnterminatedComment {
@@ -107,18 +79,6 @@ pub mod rlox_errors {
                 column,
                 line_text,
             }
-        }
-
-        pub fn get_column(&self) -> usize {
-            self.column
-        }
-
-        pub fn get_line(&self) -> usize {
-            self.line
-        }
-
-        pub fn get_line_text(&self) -> Option<&str> {
-            self.line_text.as_deref()
         }
     }
 
