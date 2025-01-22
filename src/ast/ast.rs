@@ -2,7 +2,7 @@
 use crate::token::*;
 
 macro_rules! parenthize_expr {
-    ($name:expr, $($exprs: expr),*) => {
+    ($name:expr, $($exprs:expr),*) => {
         {
             let mut ret = String::new();
             ret.push_str("(");
