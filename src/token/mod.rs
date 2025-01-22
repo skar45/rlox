@@ -47,6 +47,30 @@ impl std::fmt::Display for TokenType {
     }
 }
 
+impl TokenType {
+    pub fn match_token(token: &str) -> TokenType {
+        match token {
+            "and" => TokenType::And,
+            "class" => TokenType::Class,
+            "else" => TokenType::Else,
+            "false" => TokenType::False,
+            "for" => TokenType::For,
+            "if" => TokenType::If,
+            "nil" => TokenType::Nil,
+            "or" => TokenType::Or,
+            "print" => TokenType::Print,
+            "return" => TokenType::Return,
+            "super" => TokenType::Super,
+            "this" => TokenType::This,
+            "true" => TokenType::True,
+            "var" => TokenType::Var,
+            "while" => TokenType::While,
+            "fun" => TokenType::Fun,
+            _ => TokenType::Identifier,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum LiteralType {
     Str(String),

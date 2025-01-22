@@ -206,25 +206,7 @@ impl Scanner {
             self.advance();
         }
         let value: String = self.chars[self.start..self.current].iter().collect();
-        let token = match value.as_str() {
-            "and" => TokenType::And,
-            "class" => TokenType::Class,
-            "else" => TokenType::Else,
-            "false" => TokenType::False,
-            "for" => TokenType::For,
-            "if" => TokenType::If,
-            "nil" => TokenType::Nil,
-            "or" => TokenType::Or,
-            "print" => TokenType::Print,
-            "return" => TokenType::Return,
-            "super" => TokenType::Super,
-            "this" => TokenType::This,
-            "true" => TokenType::True,
-            "var" => TokenType::Var,
-            "while" => TokenType::While,
-            "fun" => TokenType::Fun,
-            _ => TokenType::Identifier,
-        };
+        let token = TokenType::match_token(value.as_str());
         self.add_token(token);
         Ok(())
     }

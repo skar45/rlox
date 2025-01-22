@@ -1,6 +1,7 @@
 mod errors;
 mod lexer;
 mod token;
+mod ast;
 
 use std::{
     env,
