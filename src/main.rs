@@ -1,13 +1,12 @@
+mod ast;
 mod errors;
 mod lexer;
 mod token;
-mod ast;
 
 use std::{
-    env,
-    process::ExitCode,
-    fs,
+    env, fs,
     io::{self, Write},
+    process::ExitCode,
     process::{self},
 };
 

@@ -7,7 +7,8 @@ pub struct Scanner {
     start: usize,
     current: usize,
     line: usize,
-    column: usize,
+    start_column: usize,
+    current_column: usize,
 }
 
 impl Scanner {
@@ -20,13 +21,15 @@ impl Scanner {
             start: 0,
             current: 0,
             line: 0,
-            column: 0,
+            start_column: 0,
+            current_column: 0,
         }
     }
 
     pub fn scan_tokens(&mut self) -> Result<(), ScannerError> {
         while !self.is_at_end() {
             self.start = self.current;
+            self.start_column = self.current_column;
             if let Some(c) = self.advance() {
                 match c {
                     '(' => self.add_token(TokenType::LeftParen),
@@ -83,7 +86,7 @@ impl Scanner {
                     '"' => self.process_string_literal()?,
                     def => {
                         if Scanner::char_is_num(def) {
-                            self.process_number_literal()?
+                            self.process_numeric_literal()?
                         } else if Scanner::char_is_alpha(def) {
                             self.process_identifier()?
                         } else {
@@ -102,12 +105,12 @@ impl Scanner {
 
     fn increment_line(&mut self) {
         self.line += 1;
-        self.column = 0;
+        self.current_column = 0;
     }
 
     fn increment_current(&mut self, value: usize) {
         self.current += value;
-        self.column += value;
+        self.current_column += value;
     }
 
     fn is_at_end(&self) -> bool {
@@ -156,17 +159,17 @@ impl Scanner {
 
     fn process_string_literal(&mut self) -> Result<(), UnterminatedString> {
         // store column in case the source ends in new line
-        let mut prev_column = self.column;
+        let mut prev_column = self.current_column;
         while self.peek() != '"' && !self.is_at_end() {
             if self.peek() == '\n' {
-                prev_column = self.column;
+                prev_column = self.current_column;
                 self.increment_line();
             };
             self.increment_current(1);
         }
 
         if self.is_at_end() {
-            self.column = prev_column;
+            self.current_column = prev_column;
             return Err(self.unterminated_string());
         };
 
@@ -179,7 +182,7 @@ impl Scanner {
         Ok(())
     }
 
-    fn process_number_literal(&mut self) -> Result<(), InvalidToken> {
+    fn process_numeric_literal(&mut self) -> Result<(), InvalidToken> {
         while Scanner::char_is_num(&self.peek()) {
             self.advance();
         }
@@ -213,12 +216,12 @@ impl Scanner {
 
     fn process_block_comments(&mut self) -> Result<(), UnterminatedComment> {
         // store column in case the source ends in new line
-        let mut prev_column = self.column;
+        let mut prev_column = self.current_column;
         let mut nested = 1;
         while (nested != 0) && !self.is_at_end() {
             match self.peek() {
                 '\n' => {
-                    prev_column = self.column;
+                    prev_column = self.current_column;
                     self.increment_line();
                     self.increment_current(1);
                 }
@@ -243,7 +246,7 @@ impl Scanner {
         }
 
         if nested > 0 {
-            self.column = prev_column;
+            self.current_column = prev_column;
             Err(self.unterminated_comment())
         } else {
             Ok(())
@@ -253,23 +256,23 @@ impl Scanner {
     fn invalid_token(&self, token: char) -> InvalidToken {
         InvalidToken::new(
             self.line,
-            self.column,
+            self.current_column,
             token.to_string(),
             Some(self.get_line_text()),
         )
     }
 
     fn unterminated_string(&self) -> UnterminatedString {
-        UnterminatedString::new(self.line, self.column, Some(self.get_line_text()))
+        UnterminatedString::new(self.line, self.current_column, Some(self.get_line_text()))
     }
 
     fn unterminated_comment(&self) -> UnterminatedComment {
-        UnterminatedComment::new(self.line, self.column, Some(self.get_line_text()))
+        UnterminatedComment::new(self.line, self.current_column, Some(self.get_line_text()))
     }
 
     fn get_line_text(&self) -> String {
         let start_index = if self.line > 1 {
-            self.current - self.column
+            self.start - self.start_column
         } else {
             0
         };
