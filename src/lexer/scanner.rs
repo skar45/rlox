@@ -210,7 +210,12 @@ impl Scanner {
         }
         let value: String = self.chars[self.start..self.current].iter().collect();
         let token = TokenType::match_token(value.as_str());
-        self.add_token(token);
+        match token {
+            TokenType::True => self.add_token_literal(token, LiteralType::Bool(true)),
+            TokenType::False => self.add_token_literal(token, LiteralType::Bool(false)),
+            TokenType::Nil => self.add_token_literal(token, LiteralType::Nil),
+            _ => self.add_token(token),
+        }
         Ok(())
     }
 

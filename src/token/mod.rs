@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
     LeftParen,
     RightParen,
@@ -71,10 +71,12 @@ impl TokenType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LiteralType {
     Str(String),
     Num(f64),
+    Bool(bool),
+    Nil,
 }
 
 impl std::fmt::Display for LiteralType {
@@ -82,15 +84,17 @@ impl std::fmt::Display for LiteralType {
         match self {
             LiteralType::Str(v) => write!(f, "{}", v),
             LiteralType::Num(v) => write!(f, "{}", v),
+            LiteralType::Bool(v) => write!(f, "{}", v),
+            LiteralType::Nil => write!(f, "Nil"),
         }
     }
 }
 
+#[derive(Clone)]
 pub struct Token {
     pub r#type: TokenType,
     pub lexme: String,
     pub literal: Option<LiteralType>,
-    // line: usize,
 }
 
 impl Token {
@@ -99,7 +103,6 @@ impl Token {
             r#type: TokenType::Eof,
             lexme: "".to_string(),
             literal: None,
-            // line,
         }
     }
 
