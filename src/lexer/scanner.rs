@@ -1,4 +1,4 @@
-use crate::errors::rlox_errors::*;
+use crate::errors::scanner_errors::*;
 use crate::token::*;
 
 pub struct Scanner {
@@ -99,7 +99,7 @@ impl Scanner {
                 }
             }
         }
-        self.tokens.push(Token::eof_token());
+        self.tokens.push(Token::eof_token(self.line));
         Ok(())
     }
 
@@ -296,6 +296,8 @@ impl Scanner {
             r#type,
             lexme,
             literal: None,
+            line: self.line,
+            column: self.start_column
         });
     }
 
@@ -305,6 +307,8 @@ impl Scanner {
             r#type,
             lexme,
             literal: Some(literal),
+            line: self.line,
+            column: self.start_column
         });
     }
 }

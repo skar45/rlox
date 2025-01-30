@@ -95,14 +95,18 @@ pub struct Token {
     pub r#type: TokenType,
     pub lexme: String,
     pub literal: Option<LiteralType>,
+    pub line: usize,
+    pub column: usize
 }
 
 impl Token {
-    pub fn eof_token() -> Self {
+    pub fn eof_token(line: usize) -> Self {
         Token {
             r#type: TokenType::Eof,
             lexme: "".to_string(),
             literal: None,
+            column: 0,
+            line
         }
     }
 

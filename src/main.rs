@@ -11,7 +11,9 @@ use std::{
     process::{self},
 };
 
-use crate::errors::rlox_errors::ScannerError;
+use parser::parser::Parser;
+
+use crate::errors::scanner_errors::ScannerError;
 use crate::lexer::scanner::*;
 
 pub struct Rlox {
@@ -39,8 +41,10 @@ impl Rlox {
             }
             process::exit(0x41);
         }
-        for token in scanner.tokens.iter() {
-            println!("token {}", token.to_string());
+        let mut parser = Parser::new(scanner.tokens);
+        match parser.parse() {
+            Ok(v) => println!("{}", v.accept()),
+            Err(_e) => println!("parser error")
         }
     }
 
