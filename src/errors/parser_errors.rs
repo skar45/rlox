@@ -1,7 +1,7 @@
 use std::{error::Error, fmt::Display};
 
 #[derive(Debug)]
-struct MalformedExpression {
+pub struct MalformedExpression {
     pub line: usize,
     pub column: usize,
     pub msg: String,

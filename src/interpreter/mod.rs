@@ -108,8 +108,9 @@ impl Interpreter {
     }
 
     pub fn evaluate(&self, expr: Expr) -> LiteralValue {
+        println!("running evalulation!");
         match expr {
-            Expr::Literal(l) => l.value,
+            Expr::Literal(l) => self.eval_literal(l),
             Expr::Binary(b) => self.eval_binary(b),
             Expr::Unary(u) => self.eval_unary(u),
             Expr::Grouping(g) => self.eval_group(g)

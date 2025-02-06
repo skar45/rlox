@@ -35,6 +35,7 @@ impl Parser {
         if !self.is_at_end() {
             self.current += 1;
         }
+        println!("prev {}", self.previous().lexme);
         self.previous()
     }
 
@@ -61,16 +62,19 @@ impl Parser {
     // }
 
     fn primary(&mut self) -> ParseResult {
+        println!("primary: {}", self.previous().lexme);
         match self.advance().r#type {
             TokenType::True => Ok(Expr::literal(LiteralValue::Bool(true))),
             TokenType::False => Ok(Expr::literal(LiteralValue::Bool(false))),
             TokenType::Nil => Ok(Expr::literal(LiteralValue::Nil)),
             TokenType::Number | TokenType::String => {
-                let value = Option::expect(
-                    self.previous().literal.as_ref(),
-                    "literal value not defined",
-                );
-                Ok(Expr::literal(value.clone()))
+                match &self.previous().literal {
+                    Some(v) => Ok(Expr::literal(v.clone())),
+                    None => {
+                        let token = self.previous();
+                        Err(ParserError::missing_literal(token.line, token.column, token.lexme.clone()))
+                    }
+                }
             }
             TokenType::LeftParen => {
                 let expr = self.expression();
@@ -92,6 +96,7 @@ impl Parser {
     }
 
     fn unary(&mut self) -> ParseResult {
+        println!("unary");
         match self.advance().r#type {
             TokenType::Bang | TokenType::Minus => {
                 let operator = self.previous().clone();
@@ -103,6 +108,7 @@ impl Parser {
     }
 
     fn factor(&mut self) -> ParseResult {
+        println!("factor");
         let mut expr = self.unary()?;
         loop {
             match self.advance().r#type {
@@ -118,6 +124,7 @@ impl Parser {
     }
 
     fn term(&mut self) -> ParseResult {
+        println!("term");
         let mut expr = self.factor()?;
         loop {
             match self.advance().r#type {
@@ -166,10 +173,12 @@ impl Parser {
     }
 
     fn expression(&mut self) -> ParseResult {
+        println!("expression");
         self.equality()
     }
 
     pub fn parse(&mut self) -> ParseResult {
+        println!("parsing");
         self.expression()
     }
 }
