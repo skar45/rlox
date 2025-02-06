@@ -4,7 +4,7 @@ use std::{error::Error, fmt::Display};
 struct MalformedExpression {
     pub line: usize,
     pub column: usize,
-    pub msg: String
+    pub msg: String,
 }
 
 impl Error for MalformedExpression {}
@@ -19,7 +19,7 @@ impl Display for MalformedExpression {
 pub struct NoLiteralValue {
     pub line: usize,
     pub column: usize,
-    pub token: String
+    pub token: String,
 }
 
 impl Error for NoLiteralValue {}
@@ -30,10 +30,9 @@ impl Display for NoLiteralValue {
     }
 }
 
-
 pub enum ParserError {
     ExprError(MalformedExpression),
-    ValueError(NoLiteralValue)
+    ValueError(NoLiteralValue),
 }
 
 impl ParserError {
@@ -41,7 +40,7 @@ impl ParserError {
         ParserError::ExprError(MalformedExpression {
             line,
             column,
-            msg: "missing ) at the end of expression".to_string()
+            msg: "missing ) at the end of expression".to_string(),
         })
     }
 
@@ -49,7 +48,7 @@ impl ParserError {
         ParserError::ExprError(MalformedExpression {
             line,
             column,
-            msg: "invalid expression".to_string()
+            msg: "invalid expression".to_string(),
         })
     }
 
@@ -57,18 +56,18 @@ impl ParserError {
         ParserError::ValueError(NoLiteralValue {
             line,
             column,
-            token
+            token,
         })
     }
 }
 
-impl From<MalformedExpression> for  ParserError{
+impl From<MalformedExpression> for ParserError {
     fn from(value: MalformedExpression) -> Self {
         ParserError::ExprError(value)
     }
 }
 
-impl From<NoLiteralValue> for  ParserError{
+impl From<NoLiteralValue> for ParserError {
     fn from(value: NoLiteralValue) -> Self {
         ParserError::ValueError(value)
     }

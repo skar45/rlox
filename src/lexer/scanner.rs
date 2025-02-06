@@ -84,16 +84,15 @@ impl Scanner {
                     '\n' => self.increment_line(),
                     '\t' | '\r' | ' ' => continue,
                     '"' => self.process_string_literal()?,
-                    def => {
-                        if Scanner::char_is_num(def) {
+                    d => {
+                        if Scanner::char_is_num(d) {
                             self.process_numeric_literal()?
-                        } else if Scanner::char_is_alpha(def) {
+                        } else if Scanner::char_is_alpha(d) {
                             self.process_identifier()?
                         } else {
-                            let token = def.clone();
+                            let token = d.clone();
                             self.line += 1;
-                            let error = self.invalid_token(token);
-                            return Err(error.into());
+                            return Err(self.invalid_token(token));
                         }
                     }
                 }
@@ -157,7 +156,7 @@ impl Scanner {
         Scanner::char_is_num(comp) || Scanner::char_is_alpha(comp)
     }
 
-    fn process_string_literal(&mut self) -> Result<(), UnterminatedString> {
+    fn process_string_literal(&mut self) -> Result<(), ScannerError> {
         // store column in case the source ends in new line
         let mut prev_column = self.current_column;
         while self.peek() != '"' && !self.is_at_end() {
@@ -178,11 +177,11 @@ impl Scanner {
         let value: String = self.chars[self.start + 1..self.current - 1]
             .iter()
             .collect();
-        self.add_token_literal(TokenType::String, LiteralType::Str(value));
+        self.add_token_literal(TokenType::String, LiteralValue::Str(value));
         Ok(())
     }
 
-    fn process_numeric_literal(&mut self) -> Result<(), InvalidToken> {
+    fn process_numeric_literal(&mut self) -> Result<(), ScannerError> {
         while Scanner::char_is_num(&self.peek()) {
             self.advance();
         }
@@ -198,7 +197,7 @@ impl Scanner {
             .collect::<String>()
             .parse::<f64>();
         match value {
-            Ok(v) => self.add_token_literal(TokenType::Number, LiteralType::Num(v)),
+            Ok(v) => self.add_token_literal(TokenType::Number, LiteralValue::Num(v)),
             Err(_) => return Err(self.invalid_token(self.chars[self.start])),
         }
         Ok(())
@@ -211,15 +210,15 @@ impl Scanner {
         let value: String = self.chars[self.start..self.current].iter().collect();
         let token = TokenType::match_token(value.as_str());
         match token {
-            TokenType::True => self.add_token_literal(token, LiteralType::Bool(true)),
-            TokenType::False => self.add_token_literal(token, LiteralType::Bool(false)),
-            TokenType::Nil => self.add_token_literal(token, LiteralType::Nil),
+            TokenType::True => self.add_token_literal(token, LiteralValue::Bool(true)),
+            TokenType::False => self.add_token_literal(token, LiteralValue::Bool(false)),
+            TokenType::Nil => self.add_token_literal(token, LiteralValue::Nil),
             _ => self.add_token(token),
         }
         Ok(())
     }
 
-    fn process_block_comments(&mut self) -> Result<(), UnterminatedComment> {
+    fn process_block_comments(&mut self) -> Result<(), ScannerError> {
         // store column in case the source ends in new line
         let mut prev_column = self.current_column;
         let mut nested = 1;
@@ -258,8 +257,8 @@ impl Scanner {
         }
     }
 
-    fn invalid_token(&self, token: char) -> InvalidToken {
-        InvalidToken::new(
+    fn invalid_token(&self, token: char) -> ScannerError {
+        ScannerError::invalid_token(
             self.line,
             self.current_column,
             token.to_string(),
@@ -267,12 +266,12 @@ impl Scanner {
         )
     }
 
-    fn unterminated_string(&self) -> UnterminatedString {
-        UnterminatedString::new(self.line, self.current_column, Some(self.get_line_text()))
+    fn unterminated_string(&self) -> ScannerError {
+        ScannerError::unterminated_string(self.line, self.current_column, Some(self.get_line_text()))
     }
 
-    fn unterminated_comment(&self) -> UnterminatedComment {
-        UnterminatedComment::new(self.line, self.current_column, Some(self.get_line_text()))
+    fn unterminated_comment(&self) -> ScannerError {
+        ScannerError::unterminated_comment(self.line, self.current_column, Some(self.get_line_text()))
     }
 
     fn get_line_text(&self) -> String {
@@ -297,18 +296,18 @@ impl Scanner {
             lexme,
             literal: None,
             line: self.line,
-            column: self.start_column
+            column: self.start_column,
         });
     }
 
-    fn add_token_literal(&mut self, r#type: TokenType, literal: LiteralType) {
+    fn add_token_literal(&mut self, r#type: TokenType, literal: LiteralValue) {
         let lexme = self.chars[self.start..self.current].into_iter().collect();
         self.tokens.push(Token {
             r#type,
             lexme,
             literal: Some(literal),
             line: self.line,
-            column: self.start_column
+            column: self.start_column,
         });
     }
 }

@@ -72,20 +72,20 @@ impl TokenType {
 }
 
 #[derive(Debug, Clone)]
-pub enum LiteralType {
+pub enum LiteralValue {
     Str(String),
     Num(f64),
     Bool(bool),
     Nil,
 }
 
-impl std::fmt::Display for LiteralType {
+impl std::fmt::Display for LiteralValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LiteralType::Str(v) => write!(f, "{}", v),
-            LiteralType::Num(v) => write!(f, "{}", v),
-            LiteralType::Bool(v) => write!(f, "{}", v),
-            LiteralType::Nil => write!(f, "Nil"),
+            LiteralValue::Str(v) => write!(f, "{}", v),
+            LiteralValue::Num(v) => write!(f, "{}", v),
+            LiteralValue::Bool(v) => write!(f, "{}", v),
+            LiteralValue::Nil => write!(f, "Nil"),
         }
     }
 }
@@ -94,9 +94,9 @@ impl std::fmt::Display for LiteralType {
 pub struct Token {
     pub r#type: TokenType,
     pub lexme: String,
-    pub literal: Option<LiteralType>,
+    pub literal: Option<LiteralValue>,
     pub line: usize,
-    pub column: usize
+    pub column: usize,
 }
 
 impl Token {
@@ -106,7 +106,7 @@ impl Token {
             lexme: "".to_string(),
             literal: None,
             column: 0,
-            line
+            line,
         }
     }
 

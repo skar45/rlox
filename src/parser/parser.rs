@@ -1,5 +1,7 @@
 use crate::{
-    ast::ast::Expr, errors::parser_errors::ParserError, token::{LiteralType, Token, TokenType}
+    ast::Expr,
+    errors::parser_errors::ParserError,
+    token::{LiteralValue, Token, TokenType},
 };
 
 type ParseResult = Result<Expr, ParserError>;
@@ -36,19 +38,33 @@ impl Parser {
         self.previous()
     }
 
-    fn check(&self, token_type: TokenType) -> bool {
-        if self.is_at_end() {
-            false
-        } else {
-            token_type == self.peek().r#type
-        }
-    }
+    // fn synchronize(&mut self) {
+    // self.advance();
+    // while !self.is_at_end() {
+    // match self.previous().r#type {
+    // TokenType::Semicolon => return,
+    // _ => {
+    // match self.peek().r#type {
+    // TokenType::Class
+    // | TokenType::Fun
+    // | TokenType::Var
+    // | TokenType::For
+    // | TokenType::If
+    // | TokenType::While
+    // | TokenType::Print
+    // | TokenType::Return => return,
+    // _ => self.advance(),
+    // };
+    // }
+    // };
+    // }
+    // }
 
     fn primary(&mut self) -> ParseResult {
         match self.advance().r#type {
-            TokenType::True => Ok(Expr::literal(LiteralType::Bool(true))),
-            TokenType::False => Ok(Expr::literal(LiteralType::Bool(false))),
-            TokenType::Nil => Ok(Expr::literal(LiteralType::Nil)),
+            TokenType::True => Ok(Expr::literal(LiteralValue::Bool(true))),
+            TokenType::False => Ok(Expr::literal(LiteralValue::Bool(false))),
+            TokenType::Nil => Ok(Expr::literal(LiteralValue::Nil)),
             TokenType::Number | TokenType::String => {
                 let value = Option::expect(
                     self.previous().literal.as_ref(),
@@ -64,13 +80,13 @@ impl Parser {
                         let token = self.previous();
                         let err = ParserError::missing_right_paren(token.line, token.column);
                         Err(err)
-                    },
+                    }
                 }
             }
             _ => {
-                        let token = self.previous();
-                        let err = ParserError::invalid_expression(token.line, token.column);
-                        Err(err)
+                let token = self.previous();
+                let err = ParserError::invalid_expression(token.line, token.column);
+                Err(err)
             }
         }
     }

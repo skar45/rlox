@@ -8,24 +8,7 @@ pub struct InvalidToken {
     pub line_text: Option<String>,
 }
 
-impl InvalidToken {
-    pub fn new(line: usize, column: usize, token: String, line_text: Option<String>) -> Self {
-        InvalidToken {
-            token,
-            line,
-            column,
-            line_text,
-        }
-    }
-}
-
 impl Error for InvalidToken {}
-
-impl From<InvalidToken> for ScannerError {
-    fn from(value: InvalidToken) -> Self {
-        ScannerError::TokenError(value)
-    }
-}
 
 impl Display for InvalidToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -40,23 +23,7 @@ pub struct UnterminatedString {
     pub line_text: Option<String>,
 }
 
-impl UnterminatedString {
-    pub fn new(line: usize, column: usize, line_text: Option<String>) -> Self {
-        UnterminatedString {
-            line,
-            column,
-            line_text,
-        }
-    }
-}
-
 impl Error for UnterminatedString {}
-
-impl From<UnterminatedString> for ScannerError {
-    fn from(value: UnterminatedString) -> Self {
-        ScannerError::StringError(value)
-    }
-}
 
 impl Display for UnterminatedString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -71,23 +38,7 @@ pub struct UnterminatedComment {
     pub line_text: Option<String>,
 }
 
-impl UnterminatedComment {
-    pub fn new(line: usize, column: usize, line_text: Option<String>) -> Self {
-        UnterminatedComment {
-            line,
-            column,
-            line_text,
-        }
-    }
-}
-
 impl Error for UnterminatedComment {}
-
-impl From<UnterminatedComment> for ScannerError {
-    fn from(value: UnterminatedComment) -> Self {
-        ScannerError::CommentError(value)
-    }
-}
 
 impl Display for UnterminatedComment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -99,4 +50,54 @@ pub enum ScannerError {
     TokenError(InvalidToken),
     StringError(UnterminatedString),
     CommentError(UnterminatedComment),
+}
+
+impl From<InvalidToken> for ScannerError {
+    fn from(value: InvalidToken) -> Self {
+        ScannerError::TokenError(value)
+    }
+}
+
+impl From<UnterminatedString> for ScannerError {
+    fn from(value: UnterminatedString) -> Self {
+        ScannerError::StringError(value)
+    }
+}
+
+impl From<UnterminatedComment> for ScannerError {
+    fn from(value: UnterminatedComment) -> Self {
+        ScannerError::CommentError(value)
+    }
+}
+
+
+impl ScannerError {
+    pub fn invalid_token(line: usize, column: usize, token: String, line_text: Option<String>) -> Self {
+        ScannerError::TokenError(
+        InvalidToken {
+            token,
+            line,
+            column,
+            line_text,
+        }
+        )
+    }
+
+    pub fn unterminated_string(line: usize, column: usize, line_text: Option<String>) -> Self {
+        ScannerError::StringError(UnterminatedString {
+            line,
+            column,
+            line_text,
+        })
+    }
+
+    pub fn unterminated_comment(line: usize, column: usize, line_text: Option<String>) -> Self {
+        ScannerError::CommentError(
+        UnterminatedComment {
+            line,
+            column,
+            line_text,
+        }
+        )
+    }
 }

@@ -3,6 +3,7 @@ mod errors;
 mod lexer;
 mod parser;
 mod token;
+mod interpreter;
 
 use std::{
     env, fs,
@@ -11,6 +12,7 @@ use std::{
     process::{self},
 };
 
+use interpreter::Interpreter;
 use parser::parser::Parser;
 
 use crate::errors::scanner_errors::ScannerError;
@@ -42,9 +44,13 @@ impl Rlox {
             process::exit(0x41);
         }
         let mut parser = Parser::new(scanner.tokens);
+        let interpreter = Interpreter {};
         match parser.parse() {
-            Ok(v) => println!("{}", v.accept()),
-            Err(_e) => println!("parser error")
+            Ok(v) => {
+                let result = interpreter.evaluate(v);
+                println!("{}", result);
+            },
+            Err(_e) => println!("parser error"),
         }
     }
 
