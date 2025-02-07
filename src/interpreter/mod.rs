@@ -1,14 +1,16 @@
-use crate::{ast::{Binary, Expr, Grouping, Literal, Unary}, token::{LiteralValue, TokenType}};
+use crate::{
+    ast::{Binary, Expr, Grouping, Literal, Unary},
+    token::{LiteralValue, TokenType},
+};
 
-pub struct Interpreter {
-}
+pub struct Interpreter {}
 
 impl Interpreter {
     fn is_truthy(&self, value: LiteralValue) -> bool {
         match value {
             LiteralValue::Bool(b) => b,
             LiteralValue::Nil => false,
-            _ => true
+            _ => true,
         }
     }
 
@@ -20,7 +22,7 @@ impl Interpreter {
             (LiteralValue::Num(n1), LiteralValue::Num(n2)) => n1 == n2,
             (LiteralValue::Str(s1), LiteralValue::Str(s2)) => s1 == s2,
             (LiteralValue::Bool(b1), LiteralValue::Bool(b2)) => b1 == b2,
-            _ => false
+            _ => false,
         }
     }
 
@@ -36,14 +38,12 @@ impl Interpreter {
         let right = self.evaluate(*expr.right);
 
         match expr.operator.r#type {
-            TokenType::Minus => {
-                match right {
-                    LiteralValue::Num(n) => LiteralValue::Num(-n),
-                    _ => LiteralValue::Nil
-                }
-            }
+            TokenType::Minus => match right {
+                LiteralValue::Num(n) => LiteralValue::Num(-n),
+                _ => LiteralValue::Nil,
+            },
             TokenType::Bang => LiteralValue::Bool(self.is_truthy(right)),
-            _ => LiteralValue::Nil
+            _ => LiteralValue::Nil,
         }
     }
 
@@ -52,68 +52,53 @@ impl Interpreter {
         let right = self.evaluate(*expr.right);
 
         match expr.operator.r#type {
-            TokenType::Minus => {
-                match (left, right) {
-                    (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Num(n1 - n2),
-                    _ => LiteralValue::Nil
-                }
+            TokenType::Minus => match (left, right) {
+                (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Num(n1 - n2),
+                _ => LiteralValue::Nil,
             },
-            TokenType::Slash => {
-                match (left, right) {
-                    (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Num(n1 / n2),
-                    _ => LiteralValue::Nil
-                }
+            TokenType::Slash => match (left, right) {
+                (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Num(n1 / n2),
+                _ => LiteralValue::Nil,
             },
-            TokenType::Star => {
-                match (left, right) {
-                    (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Num(n1 * n2),
-                    _ => LiteralValue::Nil
-                }
+            TokenType::Star => match (left, right) {
+                (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Num(n1 * n2),
+                _ => LiteralValue::Nil,
             },
-            TokenType::Plus => {
-                match (left, right) {
-                    (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Num(n1 + n2),
-                    (LiteralValue::Str(s1), LiteralValue::Str(s2)) => LiteralValue::Str(format!("{}{}", s1, s2)),
-                    _ => LiteralValue::Nil
+            TokenType::Plus => match (left, right) {
+                (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Num(n1 + n2),
+                (LiteralValue::Str(s1), LiteralValue::Str(s2)) => {
+                    LiteralValue::Str(format!("{}{}", s1, s2))
                 }
+                _ => LiteralValue::Nil,
             },
-            TokenType::Greater => {
-                match (left, right) {
-                    (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Bool(n1 > n2),
-                    _ => LiteralValue::Nil
-                }
+            TokenType::Greater => match (left, right) {
+                (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Bool(n1 > n2),
+                _ => LiteralValue::Nil,
             },
-            TokenType::GreaterEqual => {
-                match (left, right) {
-                    (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Bool(n1 >= n2),
-                    _ => LiteralValue::Nil
-                }
+            TokenType::GreaterEqual => match (left, right) {
+                (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Bool(n1 >= n2),
+                _ => LiteralValue::Nil,
             },
-            TokenType::Less => {
-                match (left, right) {
-                    (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Bool(n1 < n2),
-                    _ => LiteralValue::Nil
-                }
+            TokenType::Less => match (left, right) {
+                (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Bool(n1 < n2),
+                _ => LiteralValue::Nil,
             },
-            TokenType::LessEqual => {
-                match (left, right) {
-                    (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Bool(n1 <= n2),
-                    _ => LiteralValue::Nil
-                }
+            TokenType::LessEqual => match (left, right) {
+                (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Bool(n1 <= n2),
+                _ => LiteralValue::Nil,
             },
             TokenType::BangEqual => LiteralValue::Bool(!self.is_equal(left, right)),
             TokenType::EqualEqual => LiteralValue::Bool(self.is_equal(left, right)),
-            _ => LiteralValue::Nil
+            _ => LiteralValue::Nil,
         }
     }
 
     pub fn evaluate(&self, expr: Expr) -> LiteralValue {
-        println!("running evalulation!");
         match expr {
             Expr::Literal(l) => self.eval_literal(l),
             Expr::Binary(b) => self.eval_binary(b),
             Expr::Unary(u) => self.eval_unary(u),
-            Expr::Grouping(g) => self.eval_group(g)
+            Expr::Grouping(g) => self.eval_group(g),
         }
     }
 }

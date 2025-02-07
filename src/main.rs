@@ -1,9 +1,9 @@
 mod ast;
 mod errors;
+mod interpreter;
 mod lexer;
 mod parser;
 mod token;
-mod interpreter;
 
 use std::{
     env, fs,
@@ -15,9 +15,9 @@ use std::{
 use interpreter::Interpreter;
 use parser::Parser;
 
-use errors::scanner_errors::ScannerError;
-use errors::parser_errors::ParserError;
 use crate::lexer::scanner::*;
+use errors::parser_errors::ParserError;
+use errors::scanner_errors::ScannerError;
 
 pub struct Rlox {
     had_error: bool,
@@ -31,11 +31,16 @@ impl Rlox {
     fn run(&mut self, source: String) {
         let mut scanner = Scanner::new(source);
         if let Err(e) = scanner.scan_tokens() {
-            self.had_error = true;
             match e {
-                ScannerError::TokenError(e) => self.report_error(e.line, e.column, e.line_text.as_deref(), &e.to_string()),
-                ScannerError::StringError(e) => self.report_error(e.line, e.column, e.line_text.as_deref(), &e.to_string()),
-                ScannerError::CommentError(e) => self.report_error(e.line, e.column, e.line_text.as_deref(), &e.to_string())
+                ScannerError::TokenError(e) => {
+                    self.report_error(e.line, e.column, e.line_text.as_deref(), &e.to_string())
+                }
+                ScannerError::StringError(e) => {
+                    self.report_error(e.line, e.column, e.line_text.as_deref(), &e.to_string())
+                }
+                ScannerError::CommentError(e) => {
+                    self.report_error(e.line, e.column, e.line_text.as_deref(), &e.to_string())
+                }
             }
             process::exit(0x41);
         }
@@ -45,14 +50,18 @@ impl Rlox {
             Ok(v) => {
                 let result = interpreter.evaluate(v);
                 println!("{}", result);
-            },
+            }
             Err(e) => {
                 self.had_error = true;
                 match e {
-                    ParserError::ExprError(e) => println!("expr error {} {} {}", e.msg, e.line, e.column),
-                    ParserError::ValueError(e) => println!("value error {} {} {}", e.token, e.line, e.column),
+                    ParserError::ExprError(e) => {
+                        println!("expr error {} {} {}", e.msg, e.line, e.column)
+                    }
+                    ParserError::ValueError(e) => {
+                        println!("value error {} {} {}", e.token, e.line, e.column)
+                    }
                 }
-            },
+            }
         }
     }
 
@@ -67,7 +76,6 @@ impl Rlox {
                 .read_line(&mut input)
                 .expect("Unable to parse from stdin!");
             self.run(input);
-            if self.had_error { io::stdout().flush().expect("Could not flush buffer") }
             self.had_error = false;
         }
     }

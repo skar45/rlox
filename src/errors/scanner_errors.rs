@@ -70,17 +70,19 @@ impl From<UnterminatedComment> for ScannerError {
     }
 }
 
-
 impl ScannerError {
-    pub fn invalid_token(line: usize, column: usize, token: String, line_text: Option<String>) -> Self {
-        ScannerError::TokenError(
-        InvalidToken {
+    pub fn invalid_token(
+        line: usize,
+        column: usize,
+        token: String,
+        line_text: Option<String>,
+    ) -> Self {
+        ScannerError::TokenError(InvalidToken {
             token,
             line,
             column,
             line_text,
-        }
-        )
+        })
     }
 
     pub fn unterminated_string(line: usize, column: usize, line_text: Option<String>) -> Self {
@@ -92,12 +94,10 @@ impl ScannerError {
     }
 
     pub fn unterminated_comment(line: usize, column: usize, line_text: Option<String>) -> Self {
-        ScannerError::CommentError(
-        UnterminatedComment {
+        ScannerError::CommentError(UnterminatedComment {
             line,
             column,
             line_text,
-        }
-        )
+        })
     }
 }

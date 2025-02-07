@@ -2,7 +2,7 @@ use crate::errors::scanner_errors::*;
 use crate::token::*;
 
 pub struct Scanner {
-    chars: Vec<char>,
+    source: Vec<char>,
     pub tokens: Vec<Token>,
     start: usize,
     current: usize,
@@ -14,9 +14,9 @@ pub struct Scanner {
 impl Scanner {
     pub fn new(source: String) -> Self {
         let mut tokens: Vec<Token> = Vec::new();
-        tokens.reserve(128);
+        tokens.reserve(4096);
         Scanner {
-            chars: source.chars().collect(),
+            source: source.chars().collect(),
             tokens,
             start: 0,
             current: 0,
@@ -84,13 +84,13 @@ impl Scanner {
                     '\n' => self.increment_line(),
                     '\t' | '\r' | ' ' => continue,
                     '"' => self.process_string_literal()?,
-                    d => {
-                        if Scanner::char_is_num(d) {
+                    rest => {
+                        if Scanner::char_is_num(rest) {
                             self.process_numeric_literal()?
-                        } else if Scanner::char_is_alpha(d) {
+                        } else if Scanner::char_is_alpha(rest) {
                             self.process_identifier()?
                         } else {
-                            let token = d.clone();
+                            let token = rest.clone();
                             self.line += 1;
                             return Err(self.invalid_token(token));
                         }
@@ -113,11 +113,11 @@ impl Scanner {
     }
 
     fn is_at_end(&self) -> bool {
-        self.current >= self.chars.len()
+        self.current >= self.source.len()
     }
 
     fn peek(&self) -> char {
-        if let Some(c) = self.chars.get(self.current) {
+        if let Some(c) = self.source.get(self.current) {
             *c
         } else {
             '\0'
@@ -125,7 +125,7 @@ impl Scanner {
     }
 
     fn peek_next(&self) -> char {
-        if let Some(c) = self.chars.get(self.current + 1) {
+        if let Some(c) = self.source.get(self.current + 1) {
             *c
         } else {
             '\0'
@@ -133,7 +133,7 @@ impl Scanner {
     }
 
     fn char_match(&mut self, comp: char) -> bool {
-        if let Some(c) = self.chars.get(self.current) {
+        if let Some(c) = self.source.get(self.current) {
             if *c == comp {
                 self.increment_current(1);
                 return true;
@@ -174,7 +174,7 @@ impl Scanner {
 
         self.increment_current(1);
 
-        let value: String = self.chars[self.start + 1..self.current - 1]
+        let value: String = self.source[self.start + 1..self.current - 1]
             .iter()
             .collect();
         self.add_token_literal(TokenType::String, LiteralValue::Str(value));
@@ -192,13 +192,13 @@ impl Scanner {
             }
         }
 
-        let value = self.chars[self.start..self.current]
+        let value = self.source[self.start..self.current]
             .iter()
             .collect::<String>()
             .parse::<f64>();
         match value {
             Ok(v) => self.add_token_literal(TokenType::Number, LiteralValue::Num(v)),
-            Err(_) => return Err(self.invalid_token(self.chars[self.start])),
+            Err(_) => return Err(self.invalid_token(self.source[self.start])),
         }
         Ok(())
     }
@@ -207,7 +207,7 @@ impl Scanner {
         while Scanner::char_is_alphanum(&self.peek()) {
             self.advance();
         }
-        let value: String = self.chars[self.start..self.current].iter().collect();
+        let value: String = self.source[self.start..self.current].iter().collect();
         let token = TokenType::match_token(value.as_str());
         match token {
             TokenType::True => self.add_token_literal(token, LiteralValue::Bool(true)),
@@ -267,11 +267,19 @@ impl Scanner {
     }
 
     fn unterminated_string(&self) -> ScannerError {
-        ScannerError::unterminated_string(self.line, self.current_column, Some(self.get_line_text()))
+        ScannerError::unterminated_string(
+            self.line,
+            self.current_column,
+            Some(self.get_line_text()),
+        )
     }
 
     fn unterminated_comment(&self) -> ScannerError {
-        ScannerError::unterminated_comment(self.line, self.current_column, Some(self.get_line_text()))
+        ScannerError::unterminated_comment(
+            self.line,
+            self.current_column,
+            Some(self.get_line_text()),
+        )
     }
 
     fn get_line_text(&self) -> String {
@@ -280,17 +288,17 @@ impl Scanner {
         } else {
             0
         };
-        self.chars[start_index..self.current].iter().collect()
+        self.source[start_index..self.current].iter().collect()
     }
 
     fn advance(&mut self) -> Option<&char> {
         let current = self.current;
         self.increment_current(1);
-        self.chars.get(current)
+        self.source.get(current)
     }
 
     fn add_token(&mut self, r#type: TokenType) {
-        let lexme = self.chars[self.start..self.current].into_iter().collect();
+        let lexme = self.source[self.start..self.current].into_iter().collect();
         self.tokens.push(Token {
             r#type,
             lexme,
@@ -301,7 +309,7 @@ impl Scanner {
     }
 
     fn add_token_literal(&mut self, r#type: TokenType, literal: LiteralValue) {
-        let lexme = self.chars[self.start..self.current].into_iter().collect();
+        let lexme = self.source[self.start..self.current].into_iter().collect();
         self.tokens.push(Token {
             r#type,
             lexme,

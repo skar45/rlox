@@ -65,18 +65,20 @@ impl Parser {
             TokenType::True => Ok(Expr::literal(LiteralValue::Bool(true))),
             TokenType::False => Ok(Expr::literal(LiteralValue::Bool(false))),
             TokenType::Nil => Ok(Expr::literal(LiteralValue::Nil)),
-            TokenType::Number | TokenType::String => {
-                match &self.previous().literal {
-                    Some(v) => Ok(Expr::literal(v.clone())),
-                    None => {
-                        let token = self.previous();
-                        Err(ParserError::missing_literal(token.line, token.column, token.lexme.clone()))
-                    }
+            TokenType::Number | TokenType::String => match &self.previous().literal {
+                Some(v) => Ok(Expr::literal(v.clone())),
+                None => {
+                    let token = self.previous();
+                    Err(ParserError::missing_literal(
+                        token.line,
+                        token.column,
+                        token.lexme.clone(),
+                    ))
                 }
-            }
+            },
             TokenType::LeftParen => {
                 let expr = self.expression();
-                match self.advance().r#type {
+                match self.previous().r#type {
                     TokenType::RightParen => Ok(Expr::grouping(expr?)),
                     _ => {
                         let token = self.previous();

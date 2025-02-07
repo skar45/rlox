@@ -111,10 +111,9 @@ impl Token {
     }
 
     fn to_string(&self) -> String {
-        if let Some(literal) = &self.literal {
-            return format!("{:?} {} {:?}", self.r#type, self.lexme, literal);
-        } else {
-            return format!("{:?} {}", self.r#type, self.lexme);
+        match &self.literal {
+            Some(l) => format!("{:?} {} {:?}", self.r#type, self.lexme, l),
+            None => format!("{:?} {}", self.r#type, self.lexme),
         }
     }
 }

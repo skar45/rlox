@@ -30,6 +30,7 @@ impl Display for NoLiteralValue {
     }
 }
 
+#[derive(Debug)]
 pub enum ParserError {
     ExprError(MalformedExpression),
     ValueError(NoLiteralValue),
