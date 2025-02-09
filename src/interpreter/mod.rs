@@ -1,11 +1,20 @@
 use crate::{
-    ast::{Binary, Expr, Grouping, Literal, Unary},
-    token::{LiteralValue, TokenType},
+    ast::{
+        expr::{Binary, Expr, Grouping, Literal, Unary, Variable},
+        stmt::{ExprStmt, Stmt, VarStmt},
+    }, environment::Environment, token::{LiteralValue, TokenType}
 };
 
-pub struct Interpreter {}
+pub struct Interpreter {
+    environment: Environment
+}
 
 impl Interpreter {
+    pub fn new() -> Self {
+        Interpreter {
+            environment: Environment::new()
+        }
+    }
     fn is_truthy(&self, value: LiteralValue) -> bool {
         match value {
             LiteralValue::Bool(b) => b,
@@ -93,12 +102,45 @@ impl Interpreter {
         }
     }
 
-    pub fn evaluate(&self, expr: Expr) -> LiteralValue {
+    fn eval_variable(&self, expr: Variable) -> LiteralValue {
+        self.environment.get(&expr.name).clone()
+    }
+
+    fn evaluate(&self, expr: Expr) -> LiteralValue {
         match expr {
             Expr::Literal(l) => self.eval_literal(l),
             Expr::Binary(b) => self.eval_binary(b),
             Expr::Unary(u) => self.eval_unary(u),
             Expr::Grouping(g) => self.eval_group(g),
+            Expr::Variable(v) => self.eval_variable(v),
+        }
+    }
+
+    fn eval_expression_stmt(&self, stmt: ExprStmt) {
+        self.evaluate(stmt.expr);
+    }
+
+    fn eval_print_stmt(&self, stmt: ExprStmt) {
+        let value = self.evaluate(stmt.expr);
+        println!("{}", value);
+    }
+
+    fn eval_var_stmt(&mut self, stmt: VarStmt) {
+        let value = self.evaluate(stmt.initializer);
+        self.environment.define(stmt.name.lexme, value);
+    }
+
+    fn execute(&mut self, stmt: Stmt) {
+        match stmt {
+            Stmt::Expresssion(e) => self.eval_expression_stmt(e),
+            Stmt::Print(p) => self.eval_print_stmt(p),
+            Stmt::Var(v) => self.eval_var_stmt(v),
+        }
+    }
+
+    pub fn interpret(&mut self, statements: Vec<Stmt>) {
+        for statement in statements {
+            self.execute(statement)
         }
     }
 }

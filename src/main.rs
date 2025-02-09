@@ -1,4 +1,5 @@
 mod ast;
+mod environment;
 mod errors;
 mod interpreter;
 mod lexer;
@@ -12,12 +13,11 @@ use std::{
     process::{self},
 };
 
-use interpreter::Interpreter;
-use parser::Parser;
-
-use crate::lexer::scanner::*;
 use errors::parser_errors::ParserError;
 use errors::scanner_errors::ScannerError;
+use interpreter::Interpreter;
+use lexer::scanner::Scanner;
+use parser::Parser;
 
 pub struct Rlox {
     had_error: bool,
@@ -45,11 +45,10 @@ impl Rlox {
             process::exit(0x41);
         }
         let mut parser = Parser::new(scanner.tokens);
-        let interpreter = Interpreter {};
+        let mut interpreter = Interpreter::new();
         match parser.parse() {
             Ok(v) => {
-                let result = interpreter.evaluate(v);
-                println!("{}", result);
+                let _result = interpreter.interpret(v);
             }
             Err(e) => {
                 self.had_error = true;
@@ -60,6 +59,7 @@ impl Rlox {
                     ParserError::ValueError(e) => {
                         println!("value error {} {} {}", e.token, e.line, e.column)
                     }
+                    _ => todo!(),
                 }
             }
         }

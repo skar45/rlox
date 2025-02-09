@@ -1,10 +1,11 @@
 use crate::{
-    ast::Expr,
+    ast::{expr::Expr, stmt::Stmt},
     errors::parser_errors::ParserError,
     token::{LiteralValue, Token, TokenType},
 };
 
-type ParseResult = Result<Expr, ParserError>;
+type ParseExprResult = Result<Expr, ParserError>;
+type ParseStmtResult = Result<Stmt, ParserError>;
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -38,64 +39,78 @@ impl Parser {
         self.previous()
     }
 
-    // fn synchronize(&mut self) {
-    // self.advance();
-    // while !self.is_at_end() {
-    // match self.previous().r#type {
-    // TokenType::Semicolon => return,
-    // _ => {
-    // match self.peek().r#type {
-    // TokenType::Class
-    // | TokenType::Fun
-    // | TokenType::Var
-    // | TokenType::For
-    // | TokenType::If
-    // | TokenType::While
-    // | TokenType::Print
-    // | TokenType::Return => return,
-    // _ => self.advance(),
-    // };
-    // }
-    // };
-    // }
-    // }
+    fn synchronize(&mut self) {
+        self.advance();
+        while !self.is_at_end() {
+            match self.previous().r#type {
+                TokenType::Semicolon => return,
+                _ => {
+                    match self.peek().r#type {
+                        TokenType::Class
+                        | TokenType::Fun
+                        | TokenType::Var
+                        | TokenType::For
+                        | TokenType::If
+                        | TokenType::While
+                        | TokenType::Print
+                        | TokenType::Return => return,
+                        _ => self.advance(),
+                    };
+                }
+            };
+        }
+    }
 
-    fn primary(&mut self) -> ParseResult {
+    fn missing_paren(&self) -> ParserError {
+        ParserError::missing_right_paren(self.previous().line, self.previous().column)
+    }
+
+    fn missing_literal(&self) -> ParserError {
+        ParserError::missing_literal(
+            self.previous().line,
+            self.previous().column,
+            self.previous().lexme.clone(),
+        )
+    }
+
+    fn expr_error(&self, msg: &str) -> ParserError {
+        ParserError::invalid_expression(
+            self.previous().line,
+            self.previous().column,
+            msg.to_string(),
+        )
+    }
+
+    fn stmt_error(&self, msg: &str) -> ParserError {
+        ParserError::invalid_stmt(
+            self.previous().line,
+            self.previous().column,
+            msg.to_string(),
+        )
+    }
+
+    fn primary(&mut self) -> ParseExprResult {
         match self.advance().r#type {
             TokenType::True => Ok(Expr::literal(LiteralValue::Bool(true))),
             TokenType::False => Ok(Expr::literal(LiteralValue::Bool(false))),
             TokenType::Nil => Ok(Expr::literal(LiteralValue::Nil)),
             TokenType::Number | TokenType::String => match &self.previous().literal {
                 Some(v) => Ok(Expr::literal(v.clone())),
-                None => {
-                    let token = self.previous();
-                    Err(ParserError::missing_literal(
-                        token.line,
-                        token.column,
-                        token.lexme.clone(),
-                    ))
-                }
+                None => Err(self.missing_literal()),
             },
             TokenType::LeftParen => {
                 let expr = self.expression();
                 match self.previous().r#type {
                     TokenType::RightParen => Ok(Expr::grouping(expr?)),
-                    _ => {
-                        let token = self.previous();
-                        let err = ParserError::missing_right_paren(token.line, token.column);
-                        Err(err)
-                    }
+                    _ => Err(self.missing_paren()),
                 }
             }
-            _ => {
-                let token = self.previous();
-                let err = ParserError::invalid_expression(token.line, token.column);
-                Err(err)
-            }
+            TokenType::Identifier => Ok(Expr::variable(self.previous().clone())),
+            _ => Err(self.expr_error("Invalid expression.")),
         }
     }
 
-    fn unary(&mut self) -> ParseResult {
+    fn unary(&mut self) -> ParseExprResult {
         match self.peek().r#type {
             TokenType::Bang | TokenType::Minus => {
                 let operator = self.advance().clone();
@@ -106,7 +121,7 @@ impl Parser {
         }
     }
 
-    fn factor(&mut self) -> ParseResult {
+    fn factor(&mut self) -> ParseExprResult {
         let mut expr = self.unary()?;
         loop {
             match self.peek().r#type {
@@ -121,7 +136,7 @@ impl Parser {
         return Ok(expr);
     }
 
-    fn term(&mut self) -> ParseResult {
+    fn term(&mut self) -> ParseExprResult {
         let mut expr = self.factor()?;
         loop {
             match self.peek().r#type {
@@ -137,7 +152,7 @@ impl Parser {
         return Ok(expr);
     }
 
-    fn comparison(&mut self) -> ParseResult {
+    fn comparison(&mut self) -> ParseExprResult {
         let mut expr = self.term()?;
         loop {
             match self.peek().r#type {
@@ -156,7 +171,7 @@ impl Parser {
         return Ok(expr);
     }
 
-    fn equality(&mut self) -> ParseResult {
+    fn equality(&mut self) -> ParseExprResult {
         let mut expr = self.comparison()?;
         loop {
             match self.peek().r#type {
@@ -171,11 +186,75 @@ impl Parser {
         return Ok(expr);
     }
 
-    fn expression(&mut self) -> ParseResult {
+    fn expression(&mut self) -> ParseExprResult {
         self.equality()
     }
 
-    pub fn parse(&mut self) -> ParseResult {
-        self.expression()
+    fn print_statment(&mut self) -> ParseStmtResult {
+        let expr = self.expression()?;
+        match self.advance().r#type {
+            TokenType::Semicolon => Ok(Stmt::print(expr)),
+            _ => Err(self.stmt_error("missing \";\" after value")),
+        }
+    }
+
+    fn expression_statment(&mut self) -> ParseStmtResult {
+        let expr = self.expression()?;
+        match self.advance().r#type {
+            TokenType::Semicolon => Ok(Stmt::expression(expr)),
+            _ => Err(self.stmt_error("missing \";\" after expression!")),
+        }
+    }
+
+    fn statement(&mut self) -> ParseStmtResult {
+        match self.peek().r#type {
+            TokenType::Print => {
+                self.advance();
+                Ok(self.print_statment()?)
+            }
+            _ => self.expression_statment(),
+        }
+    }
+
+    fn var_declaration(&mut self) -> ParseStmtResult {
+        match self.peek().r#type {
+            TokenType::Identifier => {
+                let name = self.advance().clone();
+                let initializer = match self.peek().r#type {
+                    TokenType::Equal => {
+                        self.advance();
+                        Some(self.expression()?)
+                    }
+                    _ => None,
+                };
+                match self.advance().r#type {
+                    TokenType::Semicolon => Ok(Stmt::var(name, initializer)),
+                    _ => Err(self.stmt_error("missing \";\" after vraible name.")),
+                }
+            }
+            _ => Err(self.stmt_error("expect a variable name")),
+        }
+    }
+
+    fn declaration(&mut self) {
+        let stmt_result = match self.peek().r#type {
+            TokenType::Var => {
+                self.advance();
+                self.var_declaration()
+            }
+            _ => self.statement(),
+        };
+
+        if let Err(_) = stmt_result {
+            self.synchronize();
+        }
+    }
+
+    pub fn parse(&mut self) -> Result<Vec<Stmt>, ParserError> {
+        let mut statements: Vec<Stmt> = Vec::new();
+        while !self.is_at_end() {
+            statements.push(self.statement()?);
+        }
+        Ok(statements)
     }
 }

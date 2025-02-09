@@ -33,6 +33,7 @@ impl Display for NoLiteralValue {
 #[derive(Debug)]
 pub enum ParserError {
     ExprError(MalformedExpression),
+    StmtError(MalformedExpression),
     ValueError(NoLiteralValue),
 }
 
@@ -45,12 +46,12 @@ impl ParserError {
         })
     }
 
-    pub fn invalid_expression(line: usize, column: usize) -> Self {
-        ParserError::ExprError(MalformedExpression {
-            line,
-            column,
-            msg: "invalid expression".to_string(),
-        })
+    pub fn invalid_expression(line: usize, column: usize, msg: String) -> Self {
+        ParserError::ExprError(MalformedExpression { line, column, msg })
+    }
+
+    pub fn invalid_stmt(line: usize, column: usize, msg: String) -> Self {
+        ParserError::StmtError(MalformedExpression { line, column, msg })
     }
 
     pub fn missing_literal(line: usize, column: usize, token: String) -> Self {
