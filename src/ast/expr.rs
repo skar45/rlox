@@ -1,5 +1,4 @@
-#![allow(dead_code)]
-use crate::token::*;
+use crate::token::{LiteralValue, Token, TokenType};
 
 macro_rules! parenthize_expr {
     ($name:expr, $($exprs:expr),*) => {
@@ -23,6 +22,8 @@ pub enum Expr {
     Unary(Unary),
     Grouping(Grouping),
     Variable(Variable),
+    Assign(Assign),
+    Logical(Logical)
 }
 
 pub struct Literal {
@@ -48,6 +49,17 @@ pub struct Variable {
     pub name: Token,
 }
 
+pub struct Assign {
+    pub name: Token,
+    pub value: Box<Expr>,
+}
+
+pub struct Logical {
+    pub left: Box<Expr>,
+    pub right: Box<Expr>,
+    pub operator: Token
+}
+
 impl Expr {
     pub fn accept(&self) -> String {
         match self {
@@ -56,6 +68,8 @@ impl Expr {
             Expr::Unary(u) => parenthize_expr!(&u.operator.lexme, u.right),
             Expr::Grouping(g) => parenthize_expr!("group", g.expression),
             Expr::Variable(v) => v.name.lexme.clone(),
+            Expr::Assign(a) => parenthize_expr!(&a.name.lexme, a.value),
+            Expr::Logical(l) => parenthize_expr!(&l.operator.lexme, l.left, l.right)
         }
     }
 
@@ -88,6 +102,21 @@ impl Expr {
 
     pub fn variable(name: Token) -> Self {
         Expr::Variable(Variable { name })
+    }
+
+    pub fn assign(name: Token, value: Expr) -> Self {
+        Expr::Assign(Assign {
+            name,
+            value: Box::new(value),
+        })
+    }
+
+    pub fn logical(left: Expr, operator: Token,  right: Expr) -> Self {
+        Expr::Logical(Logical {
+            operator,
+            left: Box::new(left),
+            right: Box::new(right)
+        })
     }
 }
 

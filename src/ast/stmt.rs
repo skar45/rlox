@@ -6,6 +6,9 @@ pub enum Stmt {
     Expresssion(ExprStmt),
     Print(ExprStmt),
     Var(VarStmt),
+    Block(BlockStmt),
+    IfStmt(IfStmt),
+    WhileStmt(WhileStmt)
 }
 
 pub struct VarStmt {
@@ -15,6 +18,21 @@ pub struct VarStmt {
 
 pub struct ExprStmt {
     pub expr: Expr,
+}
+
+pub struct BlockStmt {
+    pub statements: Vec<Stmt>,
+}
+
+pub struct IfStmt {
+    pub condition: Expr,
+    pub then_branch: Box<Stmt>,
+    pub else_branch: Option<Box<Stmt>>,
+}
+
+pub struct WhileStmt {
+    pub condition: Expr,
+    pub body: Box<Stmt>
 }
 
 impl Stmt {
@@ -34,5 +52,24 @@ impl Stmt {
 
     pub fn expression(expr: Expr) -> Self {
         Stmt::Expresssion(ExprStmt { expr })
+    }
+
+    pub fn block(statements: Vec<Stmt>) -> Self {
+        Stmt::Block(BlockStmt { statements })
+    }
+
+    pub fn if_stmt(condition: Expr, then_branch: Stmt, else_branch: Option<Stmt>) -> Self {
+        Stmt::IfStmt(IfStmt {
+            condition,
+            then_branch: Box::new(then_branch),
+            else_branch: else_branch.map(|v| Box::new(v)),
+        })
+    }
+
+    pub fn while_stmt(condition: Expr, body: Stmt) -> Self {
+        Stmt::WhileStmt(WhileStmt {
+            condition,
+            body: Box::new(body)
+        })
     }
 }

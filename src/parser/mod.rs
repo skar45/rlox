@@ -186,8 +186,52 @@ impl Parser {
         return Ok(expr);
     }
 
+    fn and(&mut self) -> ParseExprResult {
+        let mut expr = self.comparison()?;
+        loop {
+            match self.peek().r#type {
+                 TokenType::And => {
+                    let operator = self.advance().clone();
+                    let right = self.comparison();
+                    expr = Expr::logical(expr, operator, right?);
+                }
+                _ => break,
+            }
+        }
+        return Ok(expr);
+    }
+
+    fn or(&mut self) -> ParseExprResult {
+        let mut expr = self.and()?;
+        loop {
+            match self.peek().r#type {
+                TokenType::Or => {
+                    let operator = self.advance().clone();
+                    let right = self.comparison();
+                    expr = Expr::logical(expr, operator, right?);
+                }
+                _ => break,
+            }
+        }
+        return Ok(expr);
+    }
+
+    fn assignment(&mut self) -> ParseExprResult {
+        let expr = self.or()?;
+        match self.peek().r#type {
+            TokenType::Equal => {
+                self.advance();
+                match expr {
+                    Expr::Variable(v) => Ok(Expr::assign(v.name.clone(), self.assignment()?)),
+                    _ => Err(self.expr_error("invalid var assignment")),
+                }
+            }
+            _ => Ok(expr),
+        }
+    }
+
     fn expression(&mut self) -> ParseExprResult {
-        self.equality()
+        self.assignment()
     }
 
     fn print_statment(&mut self) -> ParseStmtResult {
@@ -206,11 +250,79 @@ impl Parser {
         }
     }
 
+    fn block(&mut self) -> Result<Vec<Stmt>, ParserError> {
+        let mut statements: Vec<Stmt> = Vec::new();
+        while !self.is_at_end() {
+            match self.peek().r#type {
+                TokenType::RightBrace => {
+                    self.advance();
+                    return Ok(statements);
+                }
+                _ => {
+                    statements.push(self.declaration()?);
+                }
+            }
+        }
+        Err(self.expr_error("expected \"}\" after block"))
+    }
+
+    fn if_statment(&mut self) -> ParseStmtResult {
+        let condition = match self.peek().r#type {
+            TokenType::LeftParen => {
+                self.advance();
+                self.expression()?
+            },
+            _ => return Err(self.stmt_error("missing \"(\""))
+        };
+
+        match self.peek().r#type {
+            TokenType::RightParen => {
+                self.advance();
+                let then_branch = self.statement()?;
+                let else_branch = match self.previous().r#type {
+                    TokenType::Else => {
+                        self.advance();
+                        Some(self.statement()?)
+                    },
+                    _ => None
+                };
+                Ok(Stmt::if_stmt(condition, then_branch, else_branch))
+            },
+            _ => Err(self.stmt_error("missing \")\""))
+        }
+    }
+
+    fn while_statement(&mut self) -> ParseStmtResult {
+        match self.peek().r#type {
+            TokenType::LeftParen => {
+                self.advance();
+                let condition = self.expression()?;
+                match self.peek().r#type {
+                    TokenType::RightParen => {
+                        self.advance();
+                        let body = self.statement()?;
+                        Ok(Stmt::while_stmt(condition, body))
+                    },
+                    _ => Err(self.stmt_error("missing \")\""))
+                }
+            },
+            _ => Err(self.stmt_error("missing \"(\""))
+        }
+    }
+
     fn statement(&mut self) -> ParseStmtResult {
         match self.peek().r#type {
             TokenType::Print => {
                 self.advance();
                 Ok(self.print_statment()?)
+            }
+            TokenType::LeftBrace => {
+                self.advance();
+                Ok(Stmt::block(self.block()?))
+            },
+            TokenType::If => {
+                self.advance();
+                Ok(self.if_statment()?)
             }
             _ => self.expression_statment(),
         }
@@ -236,7 +348,7 @@ impl Parser {
         }
     }
 
-    fn declaration(&mut self) {
+    fn declaration(&mut self) -> ParseStmtResult {
         let stmt_result = match self.peek().r#type {
             TokenType::Var => {
                 self.advance();
@@ -248,12 +360,14 @@ impl Parser {
         if let Err(_) = stmt_result {
             self.synchronize();
         }
+
+        return stmt_result;
     }
 
     pub fn parse(&mut self) -> Result<Vec<Stmt>, ParserError> {
         let mut statements: Vec<Stmt> = Vec::new();
         while !self.is_at_end() {
-            statements.push(self.statement()?);
+            statements.push(self.declaration()?);
         }
         Ok(statements)
     }
