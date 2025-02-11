@@ -13,6 +13,7 @@ use std::{
     process::{self},
 };
 
+use environment::Environment;
 use errors::parser_errors::ParserError;
 use errors::scanner_errors::ScannerError;
 use interpreter::Interpreter;
@@ -45,7 +46,7 @@ impl Rlox {
             process::exit(0x41);
         }
         let mut parser = Parser::new(scanner.tokens);
-        let mut interpreter = Interpreter::new();
+        let mut interpreter = Interpreter::new(Environment::new());
         match parser.parse() {
             Ok(v) => {
                 let _result = interpreter.interpret(v);

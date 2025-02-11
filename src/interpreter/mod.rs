@@ -1,20 +1,22 @@
+use std::mem;
+
 use crate::{
     ast::{
         expr::{Assign, Binary, Expr, Grouping, Literal, Logical, Unary, Variable},
-        stmt::{ExprStmt, IfStmt, Stmt, VarStmt, WhileStmt},
+        stmt::{BlockStmt, ExprStmt, IfStmt, Stmt, VarStmt, WhileStmt},
     },
-    environment::Environment,
+    environment::{Environment, RcEnvironment},
     token::{LiteralValue, TokenType},
 };
 
 pub struct Interpreter {
-    environment: Environment,
+    environment: RcEnvironment,
 }
 
 impl Interpreter {
-    pub fn new() -> Self {
+    pub fn new(env: RcEnvironment) -> Self {
         Interpreter {
-            environment: Environment::new(),
+            environment: env,
         }
     }
     fn is_truthy(&self, value: &LiteralValue) -> bool {
@@ -105,18 +107,23 @@ impl Interpreter {
     }
 
     fn eval_variable(&self, expr: &Variable) -> LiteralValue {
-        match self.environment.get(&expr.name.lexme) {
+        let env = &self.environment.borrow();
+        match env.get(&expr.name.lexme) {
             Some(v) => v.clone(),
             None => LiteralValue::Nil,
         }
     }
 
     fn eval_assign(&mut self, expr: &Assign) -> LiteralValue {
-        if !self.environment.check(&expr.name.lexme) {
-            todo!("runtime error")
+        {
+            let env = &self.environment.borrow();
+            if !env.check(&expr.name.lexme) {
+                todo!("runtime error")
+            }
         }
         let value = self.evaluate(&expr.value);
-        if let Err(_) = self.environment.assign(expr.name.lexme.clone(), value) {
+        let env = &mut self.environment.borrow_mut();
+        if let Err(_) = env.assign(expr.name.lexme.clone(), value) {
             todo!("runtime error")
         }
         LiteralValue::Nil
@@ -167,15 +174,17 @@ impl Interpreter {
 
     fn eval_var_stmt(&mut self, stmt: &VarStmt) {
         let value = self.evaluate(&stmt.initializer);
-        self.environment.define(stmt.name.lexme.clone(), value);
+        self.environment.borrow_mut().define(stmt.name.lexme.clone(), value);
     }
 
-    fn execute_block(&mut self, stmts: &Vec<Stmt>, env: Environment) {
-        let prev_environment = std::mem::replace(&mut self.environment, env);
-        for stmt in stmts {
-            self.execute(&stmt);
+    fn execute_block(&mut self, stmt: &BlockStmt) {
+        let new_env = Environment::new();
+        new_env.borrow_mut().add_enclosing(self.environment.clone());
+        let prev = mem::replace(&mut self.environment, new_env);
+        for s in &stmt.statements {
+            self.execute(s);
         }
-        self.environment = prev_environment;
+        let _ = mem::replace(&mut self.environment, prev);
     }
 
     fn execute_if_stmt(&mut self, stmt: &IfStmt) {
@@ -202,7 +211,7 @@ impl Interpreter {
             Stmt::Expresssion(e) => self.eval_expression_stmt(e),
             Stmt::Print(p) => self.eval_print_stmt(p),
             Stmt::Var(v) => self.eval_var_stmt(v),
-            Stmt::Block(b) => self.execute_block(&b.statements, Environment::new()),
+            Stmt::Block(b) => self.execute_block(b),
             Stmt::IfStmt(i) => self.execute_if_stmt(i),
             Stmt::WhileStmt(w) => self.execute_while_stmt(w),
         }
