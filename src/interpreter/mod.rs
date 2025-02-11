@@ -3,7 +3,7 @@ use std::mem;
 use crate::{
     ast::{
         expr::{Assign, Binary, Expr, Grouping, Literal, Logical, Unary, Variable},
-        stmt::{BlockStmt, ExprStmt, IfStmt, Stmt, VarStmt, WhileStmt},
+        stmt::{BlockStmt, ExprStmt, ForStmt, ForStmtInitializer, IfStmt, Stmt, VarStmt, WhileStmt},
     },
     environment::{Environment, RcEnvironment},
     token::{LiteralValue, TokenType},
@@ -159,7 +159,8 @@ impl Interpreter {
             Expr::Grouping(g) => self.eval_group(g),
             Expr::Variable(v) => self.eval_variable(v),
             Expr::Assign(a) => self.eval_assign(a),
-            Expr::Logical(l) => self.eval_logical(l)
+            Expr::Logical(l) => self.eval_logical(l),
+            Expr::Call(_c) => todo!("self.eval_call(c)")
         }
     }
 
@@ -199,10 +200,31 @@ impl Interpreter {
     }
 
     fn execute_while_stmt(&mut self, stmt: &WhileStmt) {
-        let condition = self.evaluate(&stmt.condition); 
+        let mut condition = self.evaluate(&stmt.condition); 
         while self.is_truthy(&condition) {
             let body = &stmt.body;
             self.execute(body);
+            condition = self.evaluate(&stmt.condition); 
+        }
+    }
+
+    fn executre_for_stmt(&mut self, stmt: &ForStmt) {
+        if let Some(i) = &stmt.initializer {
+            match &i {
+                ForStmtInitializer::VarDecl(v) => self.eval_var_stmt(v),
+                ForStmtInitializer::ExprStmt(e) => self.eval_expression_stmt(e),
+            }
+        }
+        if let Some(c) = &stmt.condition {
+            let mut condition = self.evaluate(c);
+            while self.is_truthy(&condition) {
+                let body = &stmt.body;
+                self.execute(body);
+                if let Some(a) = &stmt.afterthought {
+                    self.evaluate(a);
+                }
+                condition = self.evaluate(c);
+            }
         }
     }
 
@@ -214,6 +236,7 @@ impl Interpreter {
             Stmt::Block(b) => self.execute_block(b),
             Stmt::IfStmt(i) => self.execute_if_stmt(i),
             Stmt::WhileStmt(w) => self.execute_while_stmt(w),
+            Stmt::ForStmt(f) => self.executre_for_stmt(f),
         }
     }
 

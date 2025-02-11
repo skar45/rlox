@@ -8,7 +8,8 @@ pub enum Stmt {
     Var(VarStmt),
     Block(BlockStmt),
     IfStmt(IfStmt),
-    WhileStmt(WhileStmt)
+    WhileStmt(WhileStmt),
+    ForStmt(ForStmt)
 }
 
 pub struct VarStmt {
@@ -32,6 +33,18 @@ pub struct IfStmt {
 
 pub struct WhileStmt {
     pub condition: Expr,
+    pub body: Box<Stmt>
+}
+
+pub enum ForStmtInitializer {
+    VarDecl(VarStmt),
+    ExprStmt(ExprStmt)
+}
+
+pub struct ForStmt {
+    pub initializer: Option<ForStmtInitializer>,
+    pub condition: Option<Expr>,
+    pub afterthought: Option<Expr>,
     pub body: Box<Stmt>
 }
 
@@ -69,6 +82,15 @@ impl Stmt {
     pub fn while_stmt(condition: Expr, body: Stmt) -> Self {
         Stmt::WhileStmt(WhileStmt {
             condition,
+            body: Box::new(body)
+        })
+    }
+
+    pub fn for_stmt(body:Stmt, initializer: Option<ForStmtInitializer>, condition: Option<Expr>, afterthought: Option<Expr>) -> Self {
+        Stmt::ForStmt(ForStmt {
+            initializer,
+            condition,
+            afterthought,
             body: Box::new(body)
         })
     }

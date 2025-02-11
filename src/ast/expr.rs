@@ -23,7 +23,8 @@ pub enum Expr {
     Grouping(Grouping),
     Variable(Variable),
     Assign(Assign),
-    Logical(Logical)
+    Logical(Logical),
+    Call(Call)
 }
 
 pub struct Literal {
@@ -60,6 +61,12 @@ pub struct Logical {
     pub operator: Token
 }
 
+pub struct Call {
+    pub callee: Box<Expr>,
+    paren: Token,
+    args: Vec<Box<Expr>>
+}
+
 impl Expr {
     pub fn accept(&self) -> String {
         match self {
@@ -69,7 +76,8 @@ impl Expr {
             Expr::Grouping(g) => parenthize_expr!("group", g.expression),
             Expr::Variable(v) => v.name.lexme.clone(),
             Expr::Assign(a) => parenthize_expr!(&a.name.lexme, a.value),
-            Expr::Logical(l) => parenthize_expr!(&l.operator.lexme, l.left, l.right)
+            Expr::Logical(l) => parenthize_expr!(&l.operator.lexme, l.left, l.right),
+            Expr::Call(_c) => todo!()
         }
     }
 
@@ -116,6 +124,14 @@ impl Expr {
             operator,
             left: Box::new(left),
             right: Box::new(right)
+        })
+    }
+
+    pub fn call(callee: Expr, paren: Token, args: Vec<Expr> ) -> Self {
+        Expr::Call(Call {
+            callee: Box::new(callee),
+            paren,
+            args: args.into_iter().map(|a| Box::new(a)).collect::<Vec<Box<Expr>>>()
         })
     }
 }

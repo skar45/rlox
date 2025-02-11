@@ -1,5 +1,5 @@
 use crate::{
-    ast::{expr::Expr, stmt::Stmt},
+    ast::{expr::Expr, stmt::{ForStmtInitializer, Stmt}},
     errors::parser_errors::ParserError,
     token::{LiteralValue, Token, TokenType},
 };
@@ -110,6 +110,39 @@ impl Parser {
         }
     }
 
+    fn call(&mut self) -> ParseExprResult {
+        let mut expr = self.primary()?;
+        loop {
+            if self.peek().r#type != TokenType::LeftParen {
+               break;
+            };
+            self.advance();
+            let mut args = Vec::new();
+            args.reserve(255);
+            loop {
+                if self.peek().r#type == TokenType::RightParen {
+                    break;
+                }
+                self.advance();
+                if args.len() > 255 {
+                    return Err(self.stmt_error("Can't have more than 255 arguments"));
+                }
+                args.push(self.expression()?);
+                if self.peek().r#type == TokenType::Comma {
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+            if self.peek().r#type != TokenType::RightParen {
+                return Err(self.stmt_error("missing \")\" for function call"));
+            }
+            let paren = self.advance().clone();
+            expr = Expr::call(expr, paren, args);
+        }
+        Ok(expr)
+    }
+
     fn unary(&mut self) -> ParseExprResult {
         match self.peek().r#type {
             TokenType::Bang | TokenType::Minus => {
@@ -187,7 +220,7 @@ impl Parser {
     }
 
     fn and(&mut self) -> ParseExprResult {
-        let mut expr = self.comparison()?;
+        let mut expr = self.equality()?;
         loop {
             match self.peek().r#type {
                  TokenType::And => {
@@ -242,7 +275,7 @@ impl Parser {
         }
     }
 
-    fn expression_statment(&mut self) -> ParseStmtResult {
+    fn expression_statement(&mut self) -> ParseStmtResult {
         let expr = self.expression()?;
         match self.advance().r#type {
             TokenType::Semicolon => Ok(Stmt::expression(expr)),
@@ -310,6 +343,53 @@ impl Parser {
         }
     }
 
+    fn for_statement(&mut self) -> ParseStmtResult {
+        if self.advance().r#type != TokenType::LeftParen {
+            return Err(self.stmt_error("missing \"(\" after \"for\""));
+        }
+
+        let initializer = match self.peek().r#type {
+            TokenType::Var => {
+                match self.var_declaration()? {
+                    Stmt::Var(v) => Some(ForStmtInitializer::VarDecl(v)),
+                    _ => return Err(self.stmt_error("invalid for loop initialization"))
+                }
+            },
+            TokenType::Semicolon => {
+                self.advance();
+                None
+            },
+            _ =>  {
+                match self.expression_statement()? {
+                    Stmt::Expresssion(e) => Some(ForStmtInitializer::ExprStmt(e)),
+                    _ => return Err(self.stmt_error("invalid for loop initialization"))
+                }
+            }
+        };
+
+        let condition = match self.peek().r#type {
+            TokenType::Semicolon => None,
+            _ => Some(self.expression()?)
+        };
+
+        if self.advance().r#type != TokenType::Semicolon {
+            return Err(self.stmt_error("missing \";\" after loop condition"));
+        };
+
+        let afterthought = match self.peek().r#type {
+            TokenType::RightParen => None,
+            _ => Some(self.expression()?)
+        };
+
+        if self.advance().r#type != TokenType::RightParen {
+            return Err(self.stmt_error("missing \")\" after loop construct"));
+        };
+
+        let body = self.statement()?;
+
+        Ok(Stmt::for_stmt(body, initializer, condition, afterthought))
+    }
+
     fn statement(&mut self) -> ParseStmtResult {
         match self.peek().r#type {
             TokenType::Print => {
@@ -323,8 +403,16 @@ impl Parser {
             TokenType::If => {
                 self.advance();
                 Ok(self.if_statment()?)
+            },
+            TokenType::While => {
+                self.advance();
+                Ok(self.while_statement()?)
+            },
+            TokenType::For => {
+                self.advance();
+                Ok(self.for_statement()?)
             }
-            _ => self.expression_statment(),
+            _ => self.expression_statement(),
         }
     }
 
