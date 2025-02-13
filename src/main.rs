@@ -1,4 +1,5 @@
 mod ast;
+mod callable;
 mod environment;
 mod errors;
 mod interpreter;
@@ -46,24 +47,9 @@ impl Rlox {
             process::exit(0x41);
         }
         let mut parser = Parser::new(scanner.tokens);
+        let (parsed_stmts, errors) = parser.parse();
         let mut interpreter = Interpreter::new(Environment::new());
-        match parser.parse() {
-            Ok(v) => {
-                let _result = interpreter.interpret(v);
-            }
-            Err(e) => {
-                self.had_error = true;
-                match e {
-                    ParserError::ExprError(e) => {
-                        println!("expr error {} {} {}", e.msg, e.line, e.column)
-                    }
-                    ParserError::ValueError(e) => {
-                        println!("value error {} {} {}", e.token, e.line, e.column)
-                    }
-                    _ => todo!(),
-                }
-            }
-        }
+        interpreter.interpret(parsed_stmts);
     }
 
     pub fn run_prompt(&mut self) {

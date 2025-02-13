@@ -2,8 +2,10 @@ use std::mem;
 
 use crate::{
     ast::{
-        expr::{Assign, Binary, Expr, Grouping, Literal, Logical, Unary, Variable},
-        stmt::{BlockStmt, ExprStmt, ForStmt, ForStmtInitializer, IfStmt, Stmt, VarStmt, WhileStmt},
+        expr::{Assign, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable},
+        stmt::{
+            BlockStmt, ExprStmt, FnStmt, ForStmt, ForStmtInitializer, IfStmt, ReturnStmt, Stmt, VarStmt, WhileStmt
+        },
     },
     environment::{Environment, RcEnvironment},
     token::{LiteralValue, TokenType},
@@ -11,13 +13,12 @@ use crate::{
 
 pub struct Interpreter {
     environment: RcEnvironment,
+    global: RcEnvironment
 }
 
 impl Interpreter {
     pub fn new(env: RcEnvironment) -> Self {
-        Interpreter {
-            environment: env,
-        }
+        Interpreter { environment: env.clone(), global: env }
     }
     fn is_truthy(&self, value: &LiteralValue) -> bool {
         match value {
@@ -108,7 +109,7 @@ impl Interpreter {
 
     fn eval_variable(&self, expr: &Variable) -> LiteralValue {
         let env = &self.environment.borrow();
-        match env.get(&expr.name.lexme) {
+        match env.get_var(&expr.name.lexme) {
             Some(v) => v.clone(),
             None => LiteralValue::Nil,
         }
@@ -123,7 +124,7 @@ impl Interpreter {
         }
         let value = self.evaluate(&expr.value);
         let env = &mut self.environment.borrow_mut();
-        if let Err(_) = env.assign(expr.name.lexme.clone(), value) {
+        if let Err(_) = env.assign_var(expr.name.lexme.clone(), value) {
             todo!("runtime error")
         }
         LiteralValue::Nil
@@ -138,7 +139,7 @@ impl Interpreter {
                 } else {
                     self.evaluate(&expr.right)
                 }
-            },
+            }
             TokenType::And => {
                 let eval_left = self.evaluate(&expr.left);
                 if self.is_truthy(&eval_left) {
@@ -146,9 +147,38 @@ impl Interpreter {
                 } else {
                     LiteralValue::Bool(false)
                 }
-            },
-            _ => todo!("interpreter error")
+            }
+            _ => todo!("interpreter error"),
         }
+    }
+
+    fn eval_call(&mut self, expr: &Call) -> LiteralValue {
+        let name = self.evaluate(&expr.callee).to_string();
+        let mut args = Vec::new();
+        for arg in &expr.args {
+            args.push(self.evaluate(&arg));
+        };
+        let env = Environment::new();
+        env.borrow_mut().add_enclosing(self.environment.clone());
+        match self.environment.clone().borrow().get_fn(&name) {
+            Some(f) => {
+                for (i, name) in f.params.iter().enumerate() {
+                    match args.get(i) {
+                        Some(value) => {
+                            env.borrow_mut().define_var(name.lexme.clone(), value.clone());
+                        },
+                        None => todo!("runtime error")
+                    }
+                }
+                let prev = mem::replace(&mut self.environment.clone(), env);
+                for stmt in &f.body {
+                    self.execute(stmt);
+                }
+                let _ = mem::replace(&mut self.environment, prev);
+            },
+            None => todo!("runtime error")
+        };
+        LiteralValue::Nil
     }
 
     fn evaluate(&mut self, expr: &Expr) -> LiteralValue {
@@ -160,7 +190,7 @@ impl Interpreter {
             Expr::Variable(v) => self.eval_variable(v),
             Expr::Assign(a) => self.eval_assign(a),
             Expr::Logical(l) => self.eval_logical(l),
-            Expr::Call(_c) => todo!("self.eval_call(c)")
+            Expr::Call(c) => self.eval_call(c),
         }
     }
 
@@ -175,7 +205,9 @@ impl Interpreter {
 
     fn eval_var_stmt(&mut self, stmt: &VarStmt) {
         let value = self.evaluate(&stmt.initializer);
-        self.environment.borrow_mut().define(stmt.name.lexme.clone(), value);
+        self.environment
+            .borrow_mut()
+            .define_var(stmt.name.lexme.clone(), value);
     }
 
     fn execute_block(&mut self, stmt: &BlockStmt) {
@@ -200,15 +232,15 @@ impl Interpreter {
     }
 
     fn execute_while_stmt(&mut self, stmt: &WhileStmt) {
-        let mut condition = self.evaluate(&stmt.condition); 
+        let mut condition = self.evaluate(&stmt.condition);
         while self.is_truthy(&condition) {
             let body = &stmt.body;
             self.execute(body);
-            condition = self.evaluate(&stmt.condition); 
+            condition = self.evaluate(&stmt.condition);
         }
     }
 
-    fn executre_for_stmt(&mut self, stmt: &ForStmt) {
+    fn execute_for_stmt(&mut self, stmt: &ForStmt) {
         if let Some(i) = &stmt.initializer {
             match &i {
                 ForStmtInitializer::VarDecl(v) => self.eval_var_stmt(v),
@@ -228,6 +260,18 @@ impl Interpreter {
         }
     }
 
+    fn declare_fn(&mut self, stmt: &FnStmt) {
+        self.environment.borrow_mut().define_fn(stmt.name.lexme.clone(), stmt.clone());
+    }
+
+    fn execute_return_stmt(&mut self, stmt: &ReturnStmt) {
+        let _ret_val = match &stmt.value {
+            Some(v) => self.evaluate(v),
+            None => LiteralValue::Nil
+        };
+        todo!("find a way to return value to the caller")
+    }
+
     fn execute(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::Expresssion(e) => self.eval_expression_stmt(e),
@@ -236,7 +280,9 @@ impl Interpreter {
             Stmt::Block(b) => self.execute_block(b),
             Stmt::IfStmt(i) => self.execute_if_stmt(i),
             Stmt::WhileStmt(w) => self.execute_while_stmt(w),
-            Stmt::ForStmt(f) => self.executre_for_stmt(f),
+            Stmt::ForStmt(f) => self.execute_for_stmt(f),
+            Stmt::FnStmt(f) => self.declare_fn(f),
+            Stmt::ReturnStmt(r) => self.execute_return_stmt(r),
         }
     }
 

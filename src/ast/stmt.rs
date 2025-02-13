@@ -2,6 +2,7 @@ use crate::token::{LiteralValue, Token};
 
 use super::expr::Expr;
 
+#[derive(Clone)]
 pub enum Stmt {
     Expresssion(ExprStmt),
     Print(ExprStmt),
@@ -9,43 +10,65 @@ pub enum Stmt {
     Block(BlockStmt),
     IfStmt(IfStmt),
     WhileStmt(WhileStmt),
-    ForStmt(ForStmt)
+    ForStmt(ForStmt),
+    FnStmt(FnStmt),
+    ReturnStmt(ReturnStmt)
 }
 
+#[derive(Clone)]
 pub struct VarStmt {
     pub name: Token,
     pub initializer: Expr,
 }
 
+#[derive(Clone)]
 pub struct ExprStmt {
     pub expr: Expr,
 }
 
+#[derive(Clone)]
 pub struct BlockStmt {
     pub statements: Vec<Stmt>,
 }
 
+#[derive(Clone)]
 pub struct IfStmt {
     pub condition: Expr,
     pub then_branch: Box<Stmt>,
     pub else_branch: Option<Box<Stmt>>,
 }
 
+#[derive(Clone)]
 pub struct WhileStmt {
     pub condition: Expr,
-    pub body: Box<Stmt>
+    pub body: Box<Stmt>,
 }
 
+#[derive(Clone)]
 pub enum ForStmtInitializer {
     VarDecl(VarStmt),
-    ExprStmt(ExprStmt)
+    ExprStmt(ExprStmt),
 }
 
+#[derive(Clone)]
 pub struct ForStmt {
     pub initializer: Option<ForStmtInitializer>,
     pub condition: Option<Expr>,
     pub afterthought: Option<Expr>,
-    pub body: Box<Stmt>
+    pub body: Box<Stmt>,
+}
+
+#[derive(Clone)]
+pub struct FnStmt {
+    pub name: Token,
+    pub params: Vec<Token>,
+    pub body: Vec<Stmt>,
+}
+
+#[derive(Clone)]
+pub struct ReturnStmt {
+    pub keyword: Token,
+    pub value: Option<Expr>
 }
 
 impl Stmt {
@@ -82,16 +105,32 @@ impl Stmt {
     pub fn while_stmt(condition: Expr, body: Stmt) -> Self {
         Stmt::WhileStmt(WhileStmt {
             condition,
-            body: Box::new(body)
+            body: Box::new(body),
         })
     }
 
-    pub fn for_stmt(body:Stmt, initializer: Option<ForStmtInitializer>, condition: Option<Expr>, afterthought: Option<Expr>) -> Self {
+    pub fn for_stmt(
+        body: Stmt,
+        initializer: Option<ForStmtInitializer>,
+        condition: Option<Expr>,
+        afterthought: Option<Expr>,
+    ) -> Self {
         Stmt::ForStmt(ForStmt {
             initializer,
             condition,
             afterthought,
-            body: Box::new(body)
+            body: Box::new(body),
+        })
+    }
+
+    pub fn fn_stmt(name: Token, params: Vec<Token>, body: Vec<Stmt>) -> Self {
+        Stmt::FnStmt(FnStmt { name, params, body })
+    }
+
+    pub fn return_stmt(keyword: Token, value: Option<Expr>) -> Self {
+        Stmt::ReturnStmt(ReturnStmt {
+            keyword,
+            value
         })
     }
 }

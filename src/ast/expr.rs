@@ -16,6 +16,7 @@ macro_rules! parenthize_expr {
     };
 }
 
+#[derive(Clone)]
 pub enum Expr {
     Literal(Literal),
     Binary(Binary),
@@ -24,47 +25,55 @@ pub enum Expr {
     Variable(Variable),
     Assign(Assign),
     Logical(Logical),
-    Call(Call)
+    Call(Call),
 }
 
+#[derive(Clone)]
 pub struct Literal {
     pub value: LiteralValue,
 }
 
+#[derive(Clone)]
 pub struct Grouping {
     pub expression: Box<Expr>,
 }
 
+#[derive(Clone)]
 pub struct Binary {
     pub left: Box<Expr>,
     pub operator: Token,
     pub right: Box<Expr>,
 }
 
+#[derive(Clone)]
 pub struct Unary {
     pub operator: Token,
     pub right: Box<Expr>,
 }
 
+#[derive(Clone)]
 pub struct Variable {
     pub name: Token,
 }
 
+#[derive(Clone)]
 pub struct Assign {
     pub name: Token,
     pub value: Box<Expr>,
 }
 
+#[derive(Clone)]
 pub struct Logical {
     pub left: Box<Expr>,
     pub right: Box<Expr>,
-    pub operator: Token
+    pub operator: Token,
 }
 
+#[derive(Clone)]
 pub struct Call {
     pub callee: Box<Expr>,
-    paren: Token,
-    args: Vec<Box<Expr>>
+    pub paren: Token,
+    pub args: Vec<Expr>,
 }
 
 impl Expr {
@@ -77,7 +86,7 @@ impl Expr {
             Expr::Variable(v) => v.name.lexme.clone(),
             Expr::Assign(a) => parenthize_expr!(&a.name.lexme, a.value),
             Expr::Logical(l) => parenthize_expr!(&l.operator.lexme, l.left, l.right),
-            Expr::Call(_c) => todo!()
+            Expr::Call(_c) => todo!(),
         }
     }
 
@@ -119,19 +128,19 @@ impl Expr {
         })
     }
 
-    pub fn logical(left: Expr, operator: Token,  right: Expr) -> Self {
+    pub fn logical(left: Expr, operator: Token, right: Expr) -> Self {
         Expr::Logical(Logical {
             operator,
             left: Box::new(left),
-            right: Box::new(right)
+            right: Box::new(right),
         })
     }
 
-    pub fn call(callee: Expr, paren: Token, args: Vec<Expr> ) -> Self {
+    pub fn call(callee: Expr, paren: Token, args: Vec<Expr>) -> Self {
         Expr::Call(Call {
             callee: Box::new(callee),
             paren,
-            args: args.into_iter().map(|a| Box::new(a)).collect::<Vec<Box<Expr>>>()
+            args,
         })
     }
 }

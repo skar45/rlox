@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Display};
+use std::{error::Error, fmt::Display, usize};
 
 #[derive(Debug)]
 pub struct MalformedExpression {
@@ -43,6 +43,14 @@ impl ParserError {
             line,
             column,
             msg: "missing ) at the end of expression".to_string(),
+        })
+    }
+
+    pub fn missing_semicolon(line: usize, column: usize ) -> Self {
+        ParserError::StmtError(MalformedExpression {
+            line,
+            column,
+            msg: "missing ; after statement".to_string()
         })
     }
 

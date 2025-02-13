@@ -1,5 +1,8 @@
 use crate::{
-    ast::{expr::Expr, stmt::{ForStmtInitializer, Stmt}},
+    ast::{
+        expr::Expr,
+        stmt::{ForStmtInitializer, Stmt},
+    },
     errors::parser_errors::ParserError,
     token::{LiteralValue, Token, TokenType},
 };
@@ -65,6 +68,10 @@ impl Parser {
         ParserError::missing_right_paren(self.previous().line, self.previous().column)
     }
 
+    fn missing_semicolon(&self) -> ParserError {
+        ParserError::missing_semicolon(self.previous().line, self.previous().column)
+    }
+
     fn missing_literal(&self) -> ParserError {
         ParserError::missing_literal(
             self.previous().line,
@@ -114,7 +121,7 @@ impl Parser {
         let mut expr = self.primary()?;
         loop {
             if self.peek().r#type != TokenType::LeftParen {
-               break;
+                break;
             };
             self.advance();
             let mut args = Vec::new();
@@ -150,7 +157,7 @@ impl Parser {
                 let right = self.unary();
                 Ok(Expr::unary(operator, right?))
             }
-            _ => self.primary(),
+            _ => self.call(),
         }
     }
 
@@ -223,7 +230,7 @@ impl Parser {
         let mut expr = self.equality()?;
         loop {
             match self.peek().r#type {
-                 TokenType::And => {
+                TokenType::And => {
                     let operator = self.advance().clone();
                     let right = self.comparison();
                     expr = Expr::logical(expr, operator, right?);
@@ -271,7 +278,7 @@ impl Parser {
         let expr = self.expression()?;
         match self.advance().r#type {
             TokenType::Semicolon => Ok(Stmt::print(expr)),
-            _ => Err(self.stmt_error("missing \";\" after value")),
+            _ => Err(self.missing_semicolon()),
         }
     }
 
@@ -279,7 +286,7 @@ impl Parser {
         let expr = self.expression()?;
         match self.advance().r#type {
             TokenType::Semicolon => Ok(Stmt::expression(expr)),
-            _ => Err(self.stmt_error("missing \";\" after expression!")),
+            _ => Err(self.missing_semicolon()),
         }
     }
 
@@ -304,8 +311,8 @@ impl Parser {
             TokenType::LeftParen => {
                 self.advance();
                 self.expression()?
-            },
-            _ => return Err(self.stmt_error("missing \"(\""))
+            }
+            _ => return Err(self.stmt_error("missing \"(\"")),
         };
 
         match self.peek().r#type {
@@ -316,12 +323,12 @@ impl Parser {
                     TokenType::Else => {
                         self.advance();
                         Some(self.statement()?)
-                    },
-                    _ => None
+                    }
+                    _ => None,
                 };
                 Ok(Stmt::if_stmt(condition, then_branch, else_branch))
-            },
-            _ => Err(self.stmt_error("missing \")\""))
+            }
+            _ => Err(self.stmt_error("missing \")\"")),
         }
     }
 
@@ -335,11 +342,11 @@ impl Parser {
                         self.advance();
                         let body = self.statement()?;
                         Ok(Stmt::while_stmt(condition, body))
-                    },
-                    _ => Err(self.stmt_error("missing \")\""))
+                    }
+                    _ => Err(self.stmt_error("missing \")\"")),
                 }
-            },
-            _ => Err(self.stmt_error("missing \"(\""))
+            }
+            _ => Err(self.stmt_error("missing \"(\"")),
         }
     }
 
@@ -349,27 +356,23 @@ impl Parser {
         }
 
         let initializer = match self.peek().r#type {
-            TokenType::Var => {
-                match self.var_declaration()? {
-                    Stmt::Var(v) => Some(ForStmtInitializer::VarDecl(v)),
-                    _ => return Err(self.stmt_error("invalid for loop initialization"))
-                }
+            TokenType::Var => match self.var_declaration()? {
+                Stmt::Var(v) => Some(ForStmtInitializer::VarDecl(v)),
+                _ => return Err(self.stmt_error("invalid for loop initialization")),
             },
             TokenType::Semicolon => {
                 self.advance();
                 None
-            },
-            _ =>  {
-                match self.expression_statement()? {
-                    Stmt::Expresssion(e) => Some(ForStmtInitializer::ExprStmt(e)),
-                    _ => return Err(self.stmt_error("invalid for loop initialization"))
-                }
             }
+            _ => match self.expression_statement()? {
+                Stmt::Expresssion(e) => Some(ForStmtInitializer::ExprStmt(e)),
+                _ => return Err(self.stmt_error("invalid for loop initialization")),
+            },
         };
 
         let condition = match self.peek().r#type {
             TokenType::Semicolon => None,
-            _ => Some(self.expression()?)
+            _ => Some(self.expression()?),
         };
 
         if self.advance().r#type != TokenType::Semicolon {
@@ -378,7 +381,7 @@ impl Parser {
 
         let afterthought = match self.peek().r#type {
             TokenType::RightParen => None,
-            _ => Some(self.expression()?)
+            _ => Some(self.expression()?),
         };
 
         if self.advance().r#type != TokenType::RightParen {
@@ -390,6 +393,49 @@ impl Parser {
         Ok(Stmt::for_stmt(body, initializer, condition, afterthought))
     }
 
+    fn fn_statement(&mut self) -> ParseStmtResult {
+        if self.peek().r#type != TokenType::Identifier {
+            return Err(self.stmt_error("expected function name"));
+        }
+        let name = self.advance().clone();
+        if self.peek().r#type != TokenType::LeftParen {
+            return Err(self.stmt_error("expected \"(\" after function name"));
+        }
+        let mut params = Vec::new();
+        loop {
+            let token = self.advance();
+            match token.r#type {
+                TokenType::RightParen => break,
+                TokenType::Comma => continue,
+                TokenType::Identifier => {
+                    if params.len() < 256 {
+                        params.push(token.clone());
+                    } else {
+                        return Err(self.stmt_error("function arguments cannot be more that 255"));
+                    }
+                },
+                _ => return Err(self.stmt_error("invalid function param")),
+            }
+        }
+        if self.peek().r#type != TokenType::LeftBrace {
+            return Err(self.stmt_error("expected \"{\" before function body"));
+        }
+        let body = self.block()?;
+        Ok(Stmt::fn_stmt(name, params, body))
+    }
+
+    fn return_statement(&mut self) -> ParseStmtResult {
+        let keyword = self.previous().clone();
+        let mut value = None;
+        if self.peek().r#type != TokenType::Semicolon {
+            value = Some(self.expression()?);
+        }
+        if self.peek().r#type != TokenType::Semicolon {
+            return Err(self.missing_semicolon());
+        }
+        Ok(Stmt::return_stmt(keyword, value))
+    }
+
     fn statement(&mut self) -> ParseStmtResult {
         match self.peek().r#type {
             TokenType::Print => {
@@ -399,18 +445,26 @@ impl Parser {
             TokenType::LeftBrace => {
                 self.advance();
                 Ok(Stmt::block(self.block()?))
-            },
+            }
             TokenType::If => {
                 self.advance();
                 Ok(self.if_statment()?)
-            },
+            }
             TokenType::While => {
                 self.advance();
                 Ok(self.while_statement()?)
-            },
+            }
             TokenType::For => {
                 self.advance();
                 Ok(self.for_statement()?)
+            }
+            TokenType::Fun => {
+                self.advance();
+                Ok(self.fn_statement()?)
+            }
+            TokenType::Return => {
+                self.advance();
+                Ok(self.return_statement()?)
             }
             _ => self.expression_statement(),
         }
@@ -429,7 +483,7 @@ impl Parser {
                 };
                 match self.advance().r#type {
                     TokenType::Semicolon => Ok(Stmt::var(name, initializer)),
-                    _ => Err(self.stmt_error("missing \";\" after vraible name.")),
+                    _ => Err(self.missing_semicolon()),
                 }
             }
             _ => Err(self.stmt_error("expect a variable name")),
@@ -452,11 +506,15 @@ impl Parser {
         return stmt_result;
     }
 
-    pub fn parse(&mut self) -> Result<Vec<Stmt>, ParserError> {
+    pub fn parse(&mut self) -> (Vec<Stmt>, Vec<ParserError>) {
         let mut statements: Vec<Stmt> = Vec::new();
+        let mut parse_errors: Vec<ParserError> = Vec::new();
         while !self.is_at_end() {
-            statements.push(self.declaration()?);
+            match self.declaration() {
+                Ok(v) => statements.push(v),
+                Err(e) => parse_errors.push(e),
+            }
         }
-        Ok(statements)
+        (statements, parse_errors)
     }
 }
