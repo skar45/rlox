@@ -46,11 +46,11 @@ impl ParserError {
         })
     }
 
-    pub fn missing_semicolon(line: usize, column: usize ) -> Self {
+    pub fn missing_semicolon(line: usize, column: usize) -> Self {
         ParserError::StmtError(MalformedExpression {
             line,
             column,
-            msg: "missing ; after statement".to_string()
+            msg: "missing ; after statement".to_string(),
         })
     }
 

@@ -12,7 +12,7 @@ pub enum Stmt {
     WhileStmt(WhileStmt),
     ForStmt(ForStmt),
     FnStmt(FnStmt),
-    ReturnStmt(ReturnStmt)
+    ReturnStmt(ReturnStmt),
 }
 
 #[derive(Clone)]
@@ -68,7 +68,7 @@ pub struct FnStmt {
 #[derive(Clone)]
 pub struct ReturnStmt {
     pub keyword: Token,
-    pub value: Option<Expr>
+    pub value: Option<Expr>,
 }
 
 impl Stmt {
@@ -128,9 +128,6 @@ impl Stmt {
     }
 
     pub fn return_stmt(keyword: Token, value: Option<Expr>) -> Self {
-        Stmt::ReturnStmt(ReturnStmt {
-            keyword,
-            value
-        })
+        Stmt::ReturnStmt(ReturnStmt { keyword, value })
     }
 }

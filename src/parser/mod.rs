@@ -130,7 +130,6 @@ impl Parser {
                 if self.peek().r#type == TokenType::RightParen {
                     break;
                 }
-                self.advance();
                 if args.len() > 255 {
                     return Err(self.stmt_error("Can't have more than 255 arguments"));
                 }
@@ -145,7 +144,7 @@ impl Parser {
                 return Err(self.stmt_error("missing \")\" for function call"));
             }
             let paren = self.advance().clone();
-            expr = Expr::call(expr, paren, args);
+            expr = Expr::call(expr.to_string(), paren, args);
         }
         Ok(expr)
     }
@@ -183,7 +182,6 @@ impl Parser {
                 TokenType::Plus | TokenType::Minus => {
                     let operator = self.advance().clone();
                     let right = self.factor();
-                    self.advance();
                     expr = Expr::binary(expr, operator, right?);
                 }
                 _ => break,
@@ -296,14 +294,19 @@ impl Parser {
             match self.peek().r#type {
                 TokenType::RightBrace => {
                     self.advance();
-                    return Ok(statements);
+                    break;
                 }
                 _ => {
                     statements.push(self.declaration()?);
                 }
             }
         }
-        Err(self.expr_error("expected \"}\" after block"))
+
+        if self.previous().r#type != TokenType::RightBrace {
+            Err(self.expr_error("expected \"}\" after block"))
+        } else {
+            Ok(statements)
+        }
     }
 
     fn if_statment(&mut self) -> ParseStmtResult {
@@ -401,6 +404,7 @@ impl Parser {
         if self.peek().r#type != TokenType::LeftParen {
             return Err(self.stmt_error("expected \"(\" after function name"));
         }
+        self.advance();
         let mut params = Vec::new();
         loop {
             let token = self.advance();
@@ -413,13 +417,14 @@ impl Parser {
                     } else {
                         return Err(self.stmt_error("function arguments cannot be more that 255"));
                     }
-                },
+                }
                 _ => return Err(self.stmt_error("invalid function param")),
             }
         }
         if self.peek().r#type != TokenType::LeftBrace {
             return Err(self.stmt_error("expected \"{\" before function body"));
         }
+        self.advance();
         let body = self.block()?;
         Ok(Stmt::fn_stmt(name, params, body))
     }

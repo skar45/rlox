@@ -15,8 +15,7 @@ use std::{
 };
 
 use environment::Environment;
-use errors::parser_errors::ParserError;
-use errors::scanner_errors::ScannerError;
+use errors::{parser_errors::ParserError, scanner_errors::ScannerError};
 use interpreter::Interpreter;
 use lexer::scanner::Scanner;
 use parser::Parser;
@@ -31,7 +30,7 @@ impl Rlox {
     }
 
     fn run(&mut self, source: String) {
-        let mut scanner = Scanner::new(source);
+        let mut scanner = Scanner::new(source.clone());
         if let Err(e) = scanner.scan_tokens() {
             match e {
                 ScannerError::TokenError(e) => {
@@ -47,7 +46,24 @@ impl Rlox {
             process::exit(0x41);
         }
         let mut parser = Parser::new(scanner.tokens);
-        let (parsed_stmts, errors) = parser.parse();
+        let (parsed_stmts, parser_errors) = parser.parse();
+        let line_text = source.split("\n").collect::<Vec<&str>>();
+        for error in parser_errors {
+            match error {
+                ParserError::ExprError(e) => {
+                    self.report_error(e.line, e.column, Some(line_text[e.line]), &e.msg)
+                }
+                ParserError::StmtError(e) => {
+                    self.report_error(e.line, e.column, Some(line_text[e.line]), &e.msg)
+                }
+                ParserError::ValueError(e) => {
+                    self.report_error(e.line, e.column, Some(line_text[e.line]), &e.to_string())
+                }
+            }
+        }
+        if self.had_error {
+            process::exit(0x41)
+        };
         let mut interpreter = Interpreter::new(Environment::new());
         interpreter.interpret(parsed_stmts);
     }

@@ -34,8 +34,8 @@ impl Scanner {
                 match c {
                     '(' => self.add_token(TokenType::LeftParen),
                     ')' => self.add_token(TokenType::RightParen),
-                    '{' => self.add_token(TokenType::RightBrace),
-                    '}' => self.add_token(TokenType::LeftBrace),
+                    '{' => self.add_token(TokenType::LeftBrace),
+                    '}' => self.add_token(TokenType::RightBrace),
                     ',' => self.add_token(TokenType::Comma),
                     '.' => self.add_token(TokenType::Dot),
                     '+' => self.add_token(TokenType::Plus),
@@ -50,8 +50,8 @@ impl Scanner {
                     }
                     '=' => {
                         match self.char_match('=') {
-                            true => self.add_token(TokenType::Equal),
-                            false => self.add_token(TokenType::EqualEqual),
+                            true => self.add_token(TokenType::EqualEqual),
+                            false => self.add_token(TokenType::Equal),
                         };
                     }
                     '<' => {

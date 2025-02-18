@@ -8,7 +8,7 @@ macro_rules! parenthize_expr {
             ret.push_str($name);
             $(
                 ret.push_str(" ");
-                ret.push_str(&$exprs.accept());
+                ret.push_str(&$exprs.to_string());
             )*
             ret.push_str(")");
             ret
@@ -71,13 +71,13 @@ pub struct Logical {
 
 #[derive(Clone)]
 pub struct Call {
-    pub callee: Box<Expr>,
+    pub callee: String,
     pub paren: Token,
     pub args: Vec<Expr>,
 }
 
 impl Expr {
-    pub fn accept(&self) -> String {
+    pub fn to_string(&self) -> String {
         match self {
             Expr::Literal(l) => l.value.to_string(),
             Expr::Binary(b) => parenthize_expr!(&b.operator.lexme, b.left, b.right),
@@ -86,7 +86,7 @@ impl Expr {
             Expr::Variable(v) => v.name.lexme.clone(),
             Expr::Assign(a) => parenthize_expr!(&a.name.lexme, a.value),
             Expr::Logical(l) => parenthize_expr!(&l.operator.lexme, l.left, l.right),
-            Expr::Call(_c) => todo!(),
+            Expr::Call(c) => parenthize_expr!("fun", c.callee),
         }
     }
 
@@ -136,9 +136,9 @@ impl Expr {
         })
     }
 
-    pub fn call(callee: Expr, paren: Token, args: Vec<Expr>) -> Self {
+    pub fn call(callee: String, paren: Token, args: Vec<Expr>) -> Self {
         Expr::Call(Call {
-            callee: Box::new(callee),
+            callee,
             paren,
             args,
         })
@@ -148,7 +148,7 @@ impl Expr {
 #[test]
 pub fn liter_expr() {
     let l = Expr::literal(LiteralValue::Num(2.0));
-    assert_eq!("2", l.accept());
+    assert_eq!("2", l.to_string());
 }
 
 #[test]
@@ -173,5 +173,5 @@ pub fn group_expr() {
     let b1 = Expr::binary(l1, multiplication, l2);
     let g = Expr::grouping(b1);
     let b2 = Expr::binary(l3, addition, g);
-    assert_eq!("(+ 9 (group (* 4 15)))", b2.accept());
+    assert_eq!("(+ 9 (group (* 4 15)))", b2.to_string());
 }

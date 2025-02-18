@@ -1,8 +1,8 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{collections::HashMap, ptr::NonNull};
 
 use crate::{ast::stmt::FnStmt, token::LiteralValue};
 
-pub type RcEnvironment = Rc<RefCell<Environment>>;
+pub type RcEnvironment = NonNull<Environment>;
 
 pub struct Environment {
     var_values: HashMap<String, LiteralValue>,
@@ -12,83 +12,84 @@ pub struct Environment {
 
 impl Environment {
     pub fn new() -> RcEnvironment {
-        Rc::new(RefCell::new(Environment {
-            var_values: HashMap::new(),
-            fn_dcls: HashMap::new(),
-            enclosing: None,
-        }))
-    }
-
-    pub fn add_enclosing(&mut self, enclosing: RcEnvironment) {
-        self.enclosing = Some(enclosing);
-    }
-
-    pub fn define_var(&mut self, name: String, value: LiteralValue) {
-        self.var_values.insert(name, value);
-    }
-
-    pub fn assign_var(&mut self, name: String, value: LiteralValue) -> Result<(), ()> {
-        if self.var_values.contains_key(&name) {
-            self.var_values.insert(name, value);
-            Ok(())
-        } else {
-            self.enclosing
-                .as_ref()
-                .map(|e| e.borrow_mut().assign_var(name, value));
-            Err(())
+        unsafe {
+            NonNull::new_unchecked(Box::into_raw(Box::new(Environment {
+                var_values: HashMap::new(),
+                fn_dcls: HashMap::new(),
+                enclosing: None,
+            })))
         }
     }
 
-    pub fn define_fn(&mut self, name: String, value: FnStmt) {
-        self.fn_dcls.insert(name, value);
-    }
-
-    pub fn assign_fn(&mut self, name: String, value: FnStmt) -> Result<(), ()> {
-        if self.fn_dcls.contains_key(&name) {
-            self.fn_dcls.insert(name, value);
-            Ok(())
-        } else {
-            self.enclosing
-                .as_ref()
-                .map(|e| e.borrow_mut().assign_fn(name, value));
-            Err(())
+    pub fn add_enclosing(env: &mut RcEnvironment, enclosing: RcEnvironment) {
+        unsafe {
+            let mut_env = env.as_mut();
+            mut_env.enclosing = Some(enclosing);
         }
     }
 
-    /// Returns a raw pointer to a the value assigned to a variable.
-    /// It should be safe for the following reasons:
-    /// - The lifetime of the variable is tied to its environment so the poiner should never be invalid as long as `Environment` gets cleaned up properly.
-    /// - The lifetime of the outer scope is longer than the inner scope. Outer variables accessed from the innerscope should always be valid.
-    /// - Variables are never removed after they are declared.
-    fn get_var_unsafe(&self, name: &str) -> Option<*const LiteralValue> {
-        match self.var_values.get(name) {
-            Some(v) => Some(v),
-            None => self
-                .enclosing
-                .as_ref()
-                .and_then(|e| e.borrow().get_var_unsafe(name)),
+    pub fn define_var(env: &mut RcEnvironment, name: String, value: LiteralValue) {
+        println!("defining variable {}: {}", name, value.to_string());
+        unsafe {
+            let mut_env = env.as_mut();
+            mut_env.var_values.insert(name, value);
         }
     }
 
-    pub fn get_var(&self, name: &str) -> Option<&LiteralValue> {
-        unsafe { self.get_var_unsafe(name).map(|v| &*v) }
-    }
-
-    fn get_fn_unsafe(&self, name: &str) -> Option<*const FnStmt> {
-        match self.fn_dcls.get(name) {
-            Some(v) => Some(v),
-            None => self
-                .enclosing
-                .as_ref()
-                .and_then(|e| e.borrow().get_fn_unsafe(name)),
+    pub fn assign_var(
+        env: &mut RcEnvironment,
+        name: String,
+        value: LiteralValue,
+    ) -> Result<(), ()> {
+        unsafe {
+            let mut_env = env.as_mut();
+            if mut_env.var_values.contains_key(&name) {
+                mut_env.var_values.insert(name, value);
+                Ok(())
+            } else {
+                mut_env
+                    .enclosing
+                    .map(|mut e| Environment::assign_var(&mut e, name, value));
+                Err(())
+            }
         }
     }
 
-    pub fn get_fn(&self, name: &str) -> Option<&FnStmt> {
-        unsafe { self.get_fn_unsafe(name).map(|v| &*v) }
+    pub fn define_fn(env: &mut RcEnvironment, name: String, value: FnStmt) {
+        unsafe {
+            let mut_env = env.as_mut();
+            mut_env.fn_dcls.insert(name, value);
+        }
     }
 
-    pub fn check(&self, name: &str) -> bool {
-        self.var_values.contains_key(name)
+    pub fn get_var<'a>(env: &mut RcEnvironment, name: &str) -> Option<&'a LiteralValue> {
+        unsafe {
+            let mut_env = env.as_mut();
+            match mut_env.var_values.get(name) {
+                Some(v) => Some(v),
+                None => mut_env
+                    .enclosing
+                    .and_then(|mut e| Environment::get_var(&mut e, name)),
+            }
+        }
+    }
+
+    pub fn get_fn<'a>(env: &mut RcEnvironment, name: &str) -> Option<&'a FnStmt> {
+        unsafe {
+            let mut_env = env.as_mut();
+            match mut_env.fn_dcls.get(name) {
+                Some(v) => Some(v),
+                None => mut_env
+                    .enclosing
+                    .and_then(|mut e| Environment::get_fn(&mut e, name)),
+            }
+        }
+    }
+
+    pub fn check(env: &mut RcEnvironment, name: &str) -> bool {
+        unsafe {
+            let mut_env = env.as_mut();
+            mut_env.var_values.contains_key(name)
+        }
     }
 }

@@ -41,11 +41,11 @@ pub enum TokenType {
     Eof,
 }
 
-impl std::fmt::Display for TokenType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_string())
-    }
-}
+// impl std::fmt::Display for TokenType {
+// fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+// write!(f, "{}", self)
+// }
+// }
 
 impl TokenType {
     pub fn match_token(token: &str) -> TokenType {
