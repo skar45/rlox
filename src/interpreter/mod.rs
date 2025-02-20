@@ -164,8 +164,8 @@ impl Interpreter {
         }
         let rlox_fn = Environment::get_fn(&mut self.environment, &expr.callee);
         if let Some(fun) = rlox_fn {
-            let env = Environment::new();
-            Environment::add_enclosing(&mut self.environment, env);
+            let mut env = Environment::new();
+            Environment::add_enclosing(&mut env, self.environment);
             let prev = mem::replace(&mut self.environment, env);
             for (i, param) in fun.params.iter().enumerate() {
                 Environment::define_var(
@@ -183,7 +183,12 @@ impl Interpreter {
                     s => self.execute(&s),
                 }
             }
-            let _ = mem::replace(&mut self.environment, prev);
+            let mut d_env = mem::replace(&mut self.environment, prev);
+            unsafe {
+                let _ = mem::drop(Box::from_raw(d_env.as_mut()));
+            }
+        } else {
+            todo!("interpreter error")
         }
         ret_val
     }
@@ -222,7 +227,10 @@ impl Interpreter {
         for s in &stmt.statements {
             self.execute(s);
         }
-        let _ = mem::replace(&mut self.environment, prev);
+        let mut d_env = mem::replace(&mut self.environment, prev);
+        unsafe {
+            let _ = mem::drop(Box::from_raw(d_env.as_mut()));
+        }
     }
 
     fn execute_if_stmt(&mut self, stmt: &IfStmt) {

@@ -29,7 +29,6 @@ impl Environment {
     }
 
     pub fn define_var(env: &mut RcEnvironment, name: String, value: LiteralValue) {
-        println!("defining variable {}: {}", name, value.to_string());
         unsafe {
             let mut_env = env.as_mut();
             mut_env.var_values.insert(name, value);

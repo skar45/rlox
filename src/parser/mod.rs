@@ -113,7 +113,7 @@ impl Parser {
                 }
             }
             TokenType::Identifier => Ok(Expr::variable(self.previous().clone())),
-            _ => Err(self.expr_error("Invalid expression.")),
+            _ => Err(self.expr_error(format!("Invalid token {}", self.previous().lexme).as_str())),
         }
     }
 
@@ -433,11 +433,13 @@ impl Parser {
         let keyword = self.previous().clone();
         let mut value = None;
         if self.peek().r#type != TokenType::Semicolon {
+            let t = self.peek();
             value = Some(self.expression()?);
         }
         if self.peek().r#type != TokenType::Semicolon {
             return Err(self.missing_semicolon());
         }
+        self.advance();
         Ok(Stmt::return_stmt(keyword, value))
     }
 

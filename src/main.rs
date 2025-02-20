@@ -8,10 +8,7 @@ mod parser;
 mod token;
 
 use std::{
-    env, fs,
-    io::{self, Write},
-    process::ExitCode,
-    process::{self},
+    env, fs, io::{self, Write}, process::{self, ExitCode}
 };
 
 use environment::Environment;
@@ -64,8 +61,13 @@ impl Rlox {
         if self.had_error {
             process::exit(0x41)
         };
-        let mut interpreter = Interpreter::new(Environment::new());
+        let mut env = Environment::new();
+        let mut interpreter = Interpreter::new(env);
         interpreter.interpret(parsed_stmts);
+        // clean up env to prevent memory leak
+        unsafe {
+            let _ = std::mem::drop(Box::from_raw(env.as_mut()));
+        }
     }
 
     pub fn run_prompt(&mut self) {
