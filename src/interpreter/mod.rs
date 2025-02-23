@@ -1,27 +1,21 @@
 use std::mem;
 
 use crate::{
-    ast::{
-        expr::{Assign, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable},
-        stmt::{
-            BlockStmt, ExprStmt, FnStmt, ForStmt, ForStmtInitializer, IfStmt, ReturnStmt, Stmt,
-            VarStmt, WhileStmt,
-        },
-    },
+    ast::{expr::*, stmt::*},
     environment::{Environment, RcEnvironment},
     token::{LiteralValue, TokenType},
 };
 
 pub struct Interpreter {
-    environment: RcEnvironment,
-    global: RcEnvironment,
+    current_env: RcEnvironment,
+    _global: RcEnvironment,
 }
 
 impl Interpreter {
     pub fn new(env: RcEnvironment) -> Self {
         Interpreter {
-            environment: env.clone(),
-            global: env,
+            current_env: env.clone(),
+            _global: env,
         }
     }
     fn is_truthy(&self, value: &LiteralValue) -> bool {
@@ -112,22 +106,20 @@ impl Interpreter {
     }
 
     fn eval_variable(&mut self, expr: &Variable) -> LiteralValue {
-        match Environment::get_var(&mut self.environment, &expr.name.lexme) {
+        match Environment::get_var(&mut self.current_env, &expr.name.lexme) {
             Some(v) => v.clone(),
             None => LiteralValue::Nil,
         }
     }
 
     fn eval_assign(&mut self, expr: &Assign) -> LiteralValue {
-        {
-            let check = Environment::check(&mut self.environment, &expr.name.lexme);
-            if !check {
-                todo!("runtime error")
-            }
+        let check = Environment::check(&mut self.current_env, &expr.name.lexme);
+        if !check {
+            todo!("runtime error")
         }
         let value = self.evaluate(&expr.value);
         if let Err(_) =
-            Environment::assign_var(&mut self.environment, expr.name.lexme.clone(), value)
+            Environment::assign_var(&mut self.current_env, expr.name.lexme.clone(), value)
         {
             todo!("runtime error")
         }
@@ -162,14 +154,14 @@ impl Interpreter {
         for arg in &expr.args {
             args.push(self.evaluate(&arg));
         }
-        let rlox_fn = Environment::get_fn(&mut self.environment, &expr.callee);
+        let rlox_fn = Environment::get_fn(&mut self.current_env, &expr.callee);
         if let Some(fun) = rlox_fn {
             let mut env = Environment::new();
-            Environment::add_enclosing(&mut env, self.environment);
-            let prev = mem::replace(&mut self.environment, env);
+            Environment::add_enclosing(&mut env, self.current_env);
+            let prev = mem::replace(&mut self.current_env, env);
             for (i, param) in fun.params.iter().enumerate() {
                 Environment::define_var(
-                    &mut self.environment,
+                    &mut self.current_env,
                     param.lexme.clone(),
                     args[i].clone(),
                 );
@@ -183,7 +175,7 @@ impl Interpreter {
                     s => self.execute(&s),
                 }
             }
-            let mut d_env = mem::replace(&mut self.environment, prev);
+            let mut d_env = mem::replace(&mut self.current_env, prev);
             unsafe {
                 let _ = mem::drop(Box::from_raw(d_env.as_mut()));
             }
@@ -217,17 +209,17 @@ impl Interpreter {
 
     fn define_var_stmt(&mut self, stmt: &VarStmt) {
         let value = self.evaluate(&stmt.initializer);
-        Environment::define_var(&mut self.environment, stmt.name.lexme.clone(), value);
+        Environment::define_var(&mut self.current_env, stmt.name.lexme.clone(), value);
     }
 
     fn execute_block(&mut self, stmt: &BlockStmt) {
         let mut new_env = Environment::new();
-        Environment::add_enclosing(&mut new_env, self.environment);
-        let prev = mem::replace(&mut self.environment, new_env);
+        Environment::add_enclosing(&mut new_env, self.current_env);
+        let prev = mem::replace(&mut self.current_env, new_env);
         for s in &stmt.statements {
             self.execute(s);
         }
-        let mut d_env = mem::replace(&mut self.environment, prev);
+        let mut d_env = mem::replace(&mut self.current_env, prev);
         unsafe {
             let _ = mem::drop(Box::from_raw(d_env.as_mut()));
         }
@@ -274,7 +266,7 @@ impl Interpreter {
     }
 
     fn declare_fn(&mut self, stmt: &FnStmt) {
-        Environment::define_fn(&mut self.environment, stmt.name.lexme.clone(), stmt.clone());
+        Environment::define_fn(&mut self.current_env, stmt.name.lexme.clone(), stmt.clone());
     }
 
     fn execute_return_stmt(&mut self, stmt: &ReturnStmt) -> LiteralValue {

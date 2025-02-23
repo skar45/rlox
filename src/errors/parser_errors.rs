@@ -1,11 +1,9 @@
+use rlox_macros::rlox_error;
 use std::{error::Error, fmt::Display, usize};
 
 #[derive(Debug)]
-pub struct MalformedExpression {
-    pub line: usize,
-    pub column: usize,
-    pub msg: String,
-}
+#[rlox_error]
+pub struct MalformedExpression {}
 
 impl Error for MalformedExpression {}
 
@@ -16,17 +14,14 @@ impl Display for MalformedExpression {
 }
 
 #[derive(Debug)]
-pub struct NoLiteralValue {
-    pub line: usize,
-    pub column: usize,
-    pub token: String,
-}
+#[rlox_error]
+pub struct NoLiteralValue {}
 
 impl Error for NoLiteralValue {}
 
 impl Display for NoLiteralValue {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "missing value for token, {}", self.token)
+        write!(f, "missing value for token, {}", self.msg)
     }
 }
 
@@ -62,12 +57,8 @@ impl ParserError {
         ParserError::StmtError(MalformedExpression { line, column, msg })
     }
 
-    pub fn missing_literal(line: usize, column: usize, token: String) -> Self {
-        ParserError::ValueError(NoLiteralValue {
-            line,
-            column,
-            token,
-        })
+    pub fn missing_literal(line: usize, column: usize, msg: String) -> Self {
+        ParserError::ValueError(NoLiteralValue { line, column, msg })
     }
 }
 

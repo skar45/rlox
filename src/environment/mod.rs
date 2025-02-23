@@ -46,10 +46,10 @@ impl Environment {
                 mut_env.var_values.insert(name, value);
                 Ok(())
             } else {
-                mut_env
-                    .enclosing
-                    .map(|mut e| Environment::assign_var(&mut e, name, value));
-                Err(())
+                match mut_env.enclosing {
+                    Some(mut e) => Environment::assign_var(&mut e, name, value),
+                    None => Err(()),
+                }
             }
         }
     }
@@ -88,7 +88,13 @@ impl Environment {
     pub fn check(env: &mut RcEnvironment, name: &str) -> bool {
         unsafe {
             let mut_env = env.as_mut();
-            mut_env.var_values.contains_key(name)
+            match mut_env.var_values.contains_key(name) {
+                true => true,
+                false => match mut_env.enclosing {
+                    Some(mut e) => Environment::check(&mut e, name),
+                    None => false,
+                },
+            }
         }
     }
 }

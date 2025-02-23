@@ -185,7 +185,7 @@ impl Scanner {
         while Scanner::char_is_num(&self.peek()) {
             self.advance();
         }
-        if self.peek_next() == '.' {
+        if self.peek() == '.' {
             self.advance();
             while Scanner::char_is_num(&self.peek()) {
                 self.advance();

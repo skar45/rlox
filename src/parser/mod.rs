@@ -106,9 +106,9 @@ impl Parser {
                 None => Err(self.missing_literal()),
             },
             TokenType::LeftParen => {
-                let expr = self.expression();
-                match self.previous().r#type {
-                    TokenType::RightParen => Ok(Expr::grouping(expr?)),
+                let expr = self.expression()?;
+                match self.advance().r#type {
+                    TokenType::RightParen => Ok(Expr::grouping(expr)),
                     _ => Err(self.missing_paren()),
                 }
             }
@@ -181,8 +181,8 @@ impl Parser {
             match self.peek().r#type {
                 TokenType::Plus | TokenType::Minus => {
                     let operator = self.advance().clone();
-                    let right = self.factor();
-                    expr = Expr::binary(expr, operator, right?);
+                    let right = self.factor()?;
+                    expr = Expr::binary(expr, operator, right);
                 }
                 _ => break,
             }
@@ -199,9 +199,9 @@ impl Parser {
                 | TokenType::Less
                 | TokenType::LessEqual => {
                     let operator = self.advance().clone();
-                    let right = self.term();
+                    let right = self.term()?;
                     self.advance();
-                    expr = Expr::binary(expr, operator, right?);
+                    expr = Expr::binary(expr, operator, right);
                 }
                 _ => break,
             }
@@ -213,10 +213,10 @@ impl Parser {
         let mut expr = self.comparison()?;
         loop {
             match self.peek().r#type {
-                TokenType::Bang | TokenType::EqualEqual => {
+                TokenType::BangEqual | TokenType::EqualEqual => {
                     let operator = self.advance().clone();
-                    let right = self.comparison();
-                    expr = Expr::binary(expr, operator, right?);
+                    let right = self.comparison()?;
+                    expr = Expr::binary(expr, operator, right);
                 }
                 _ => break,
             }
@@ -310,29 +310,28 @@ impl Parser {
     }
 
     fn if_statment(&mut self) -> ParseStmtResult {
-        let condition = match self.peek().r#type {
-            TokenType::LeftParen => {
-                self.advance();
-                self.expression()?
-            }
-            _ => return Err(self.stmt_error("missing \"(\"")),
-        };
-
-        match self.peek().r#type {
-            TokenType::RightParen => {
-                self.advance();
-                let then_branch = self.statement()?;
-                let else_branch = match self.previous().r#type {
-                    TokenType::Else => {
-                        self.advance();
-                        Some(self.statement()?)
-                    }
-                    _ => None,
-                };
-                Ok(Stmt::if_stmt(condition, then_branch, else_branch))
-            }
-            _ => Err(self.stmt_error("missing \")\"")),
+        if self.peek().r#type != TokenType::LeftParen {
+            return Err(self.stmt_error("missing \")\""));
         }
+
+        let condition = self.expression()?;
+
+        if self.advance().r#type != TokenType::RightParen {
+            return Err(self.stmt_error("missing \")\""));
+        }
+
+        let then_branch = self.statement()?;
+        self.advance();
+        let else_branch = match self.previous().r#type {
+            TokenType::Else => {
+                self.advance();
+                let ret = Some(self.statement()?);
+                self.advance();
+                ret
+            }
+            _ => None,
+        };
+        Ok(Stmt::if_stmt(condition, then_branch, else_branch))
     }
 
     fn while_statement(&mut self) -> ParseStmtResult {
@@ -359,10 +358,13 @@ impl Parser {
         }
 
         let initializer = match self.peek().r#type {
-            TokenType::Var => match self.var_declaration()? {
-                Stmt::Var(v) => Some(ForStmtInitializer::VarDecl(v)),
-                _ => return Err(self.stmt_error("invalid for loop initialization")),
-            },
+            TokenType::Var => {
+                self.advance();
+                match self.var_declaration()? {
+                    Stmt::Var(v) => Some(ForStmtInitializer::VarDecl(v)),
+                    _ => return Err(self.stmt_error("invalid for loop initialization")),
+                }
+            }
             TokenType::Semicolon => {
                 self.advance();
                 None
@@ -373,12 +375,13 @@ impl Parser {
             },
         };
 
+
         let condition = match self.peek().r#type {
             TokenType::Semicolon => None,
             _ => Some(self.expression()?),
         };
 
-        if self.advance().r#type != TokenType::Semicolon {
+        if self.previous().r#type != TokenType::Semicolon {
             return Err(self.stmt_error("missing \";\" after loop condition"));
         };
 
@@ -432,10 +435,7 @@ impl Parser {
     fn return_statement(&mut self) -> ParseStmtResult {
         let keyword = self.previous().clone();
         let mut value = None;
-        if self.peek().r#type != TokenType::Semicolon {
-            let t = self.peek();
-            value = Some(self.expression()?);
-        }
+        if self.peek().r#type != TokenType::Semicolon { value = Some(self.expression()?); }
         if self.peek().r#type != TokenType::Semicolon {
             return Err(self.missing_semicolon());
         }
@@ -493,7 +493,7 @@ impl Parser {
                     _ => Err(self.missing_semicolon()),
                 }
             }
-            _ => Err(self.stmt_error("expect a variable name")),
+            _ => Err(self.stmt_error("expected a variable name")),
         }
     }
 

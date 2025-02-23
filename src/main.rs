@@ -8,7 +8,9 @@ mod parser;
 mod token;
 
 use std::{
-    env, fs, io::{self, Write}, process::{self, ExitCode}
+    env, fs,
+    io::{self, Write},
+    process::{self, ExitCode},
 };
 
 use environment::Environment;
@@ -27,6 +29,7 @@ impl Rlox {
     }
 
     fn run(&mut self, source: String) {
+        // Lex
         let mut scanner = Scanner::new(source.clone());
         if let Err(e) = scanner.scan_tokens() {
             match e {
@@ -42,6 +45,7 @@ impl Rlox {
             }
             process::exit(0x41);
         }
+        // Parse
         let mut parser = Parser::new(scanner.tokens);
         let (parsed_stmts, parser_errors) = parser.parse();
         let line_text = source.split("\n").collect::<Vec<&str>>();
@@ -61,6 +65,7 @@ impl Rlox {
         if self.had_error {
             process::exit(0x41)
         };
+        // Interpret
         let mut env = Environment::new();
         let mut interpreter = Interpreter::new(env);
         interpreter.interpret(parsed_stmts);
