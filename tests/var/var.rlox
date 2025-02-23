@@ -1,0 +1,16 @@
+var a = "A";
+var b = 12.23;
+var c = false;
+var d = true;
+var e = a;
+var f = b + 10;
+var g = c or d;
+var h = (b + 1) + (b * 2);
+print a;
+print b;
+print c;
+print d;
+print e;
+print f;
+print g;
+print h;

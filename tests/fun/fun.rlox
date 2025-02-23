@@ -1,0 +1,31 @@
+fun printVal(val) {
+    print val;
+}
+
+fun scopeCheck(a) {
+    var b = 1;
+    print a + b;
+}
+
+fun globalCheck(a) {
+    print a + " " + b;
+}
+
+fun nestedFunction(a) {
+    var b = "bar";
+    fun nested(b) {
+	var c = nil;
+	{
+	    c = "baz";
+	}
+	print a + b + c;
+    }
+    nested(b);
+}
+
+var a = "Hello";
+var b = "World!";
+var c = 2;
+printVal(a + " " + b);
+scopeCheck(c);
+nestedFunction("foo");

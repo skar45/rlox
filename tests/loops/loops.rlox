@@ -1,0 +1,17 @@
+var a = 10;
+while (a != 0) {
+    print a;
+    a = a - 1;
+}
+for (var i = a; i < 5; i = i + 1) {
+    print i;
+}
+for (a = 0; a < 3;) {
+    print a;
+    a = a + 1;
+}
+a = 0;
+for (; a < 3;) {
+    print a;
+    a = a + 1;
+}
