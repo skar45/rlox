@@ -1,5 +1,4 @@
 mod ast;
-mod callable;
 mod environment;
 mod errors;
 mod interpreter;
