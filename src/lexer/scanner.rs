@@ -262,7 +262,6 @@ impl Scanner {
             self.line,
             self.current_column,
             token.to_string(),
-            Some(self.get_line_text()),
         )
     }
 
@@ -270,7 +269,7 @@ impl Scanner {
         ScannerError::unterminated_string(
             self.line,
             self.current_column,
-            Some(self.get_line_text()),
+            self.get_line_text(),
         )
     }
 
@@ -278,7 +277,7 @@ impl Scanner {
         ScannerError::unterminated_comment(
             self.line,
             self.current_column,
-            Some(self.get_line_text()),
+            self.get_line_text(),
         )
     }
 

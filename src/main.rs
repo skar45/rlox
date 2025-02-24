@@ -13,7 +13,7 @@ use std::{
 };
 
 use environment::Environment;
-use errors::{parser_errors::ParserError, scanner_errors::ScannerError};
+use errors::{parser_errors::ParserError, scanner_errors::ScannerError, ReportError};
 use interpreter::Interpreter;
 use lexer::scanner::Scanner;
 use parser::Parser;
@@ -30,18 +30,7 @@ impl Rlox {
     fn run(&mut self, source: String) {
         // Lex
         let mut scanner = Scanner::new(source.clone());
-        if let Err(e) = scanner.scan_tokens() {
-            match e {
-                ScannerError::TokenError(e) => {
-                    self.report_error(e.line, e.column, e.line_text.as_deref(), &e.to_string())
-                }
-                ScannerError::StringError(e) => {
-                    self.report_error(e.line, e.column, e.line_text.as_deref(), &e.to_string())
-                }
-                ScannerError::CommentError(e) => {
-                    self.report_error(e.line, e.column, e.line_text.as_deref(), &e.to_string())
-                }
-            }
+        if let Err(_e) = scanner.scan_tokens() {
             process::exit(0x41);
         }
         // Parse
@@ -49,17 +38,7 @@ impl Rlox {
         let (parsed_stmts, parser_errors) = parser.parse();
         let line_text = source.split("\n").collect::<Vec<&str>>();
         for error in parser_errors {
-            match error {
-                ParserError::ExprError(e) => {
-                    self.report_error(e.line, e.column, Some(line_text[e.line]), &e.msg)
-                }
-                ParserError::StmtError(e) => {
-                    self.report_error(e.line, e.column, Some(line_text[e.line]), &e.msg)
-                }
-                ParserError::ValueError(e) => {
-                    self.report_error(e.line, e.column, Some(line_text[e.line]), &e.to_string())
-                }
-            }
+            self.report_error(error, line_text[error.get_line()]);
         }
         if self.had_error {
             process::exit(0x41)
@@ -101,23 +80,24 @@ impl Rlox {
         }
     }
 
-    fn report_error(&mut self, line: usize, column: usize, line_text: Option<&str>, message: &str) {
-        if let Some(text) = line_text {
-            let l_pad = "    ";
-            let mut offset = "".to_string();
-            for _ in 2..column {
-                offset.push(' ');
-            }
-            let text_lines: Vec<&str> = text.lines().collect();
-            eprintln!("\x1b[37;41m Error \x1b[0m: {}", message);
-            println!("{}|", l_pad);
-            for i in 1..=text_lines.len() {
-                let line_num = (line - text_lines.len()) + i;
-                let l_pad = if line_num > 9 { "  " } else { "   " };
-                println!("{}{}| {}", line_num, l_pad, text_lines[i - 1]);
-            }
-            println!("{}| {}^^", l_pad, offset);
+    fn report_error<E: ReportError>(&mut self, error: E, text: &str)  {
+        let column = error.get_column();
+        let line = error.get_line();
+        let message = error.get_msg();
+        let l_pad = "    ";
+        let mut offset = "".to_string();
+        for _ in 2..column {
+            offset.push(' ');
         }
+        let text_lines: Vec<&str> = text.lines().collect();
+        eprintln!("\x1b[37;41m Error \x1b[0m: {}", message);
+        println!("{}|", l_pad);
+        for i in 1..=text_lines.len() {
+            let line_num = (line - text_lines.len()) + i;
+            let l_pad = if line_num > 9 { "  " } else { "   " };
+            println!("{}{}| {}", line_num, l_pad, text_lines[i - 1]);
+        }
+        println!("{}| {}^^", l_pad, offset);
         self.had_error = true;
     }
 }

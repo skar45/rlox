@@ -1,103 +1,55 @@
 use std::{error::Error, fmt::Display};
 
-#[derive(Debug)]
-pub struct InvalidToken {
-    pub token: String,
-    pub line: usize,
-    pub column: usize,
-    pub line_text: Option<String>,
-}
-
-impl Error for InvalidToken {}
-
-impl Display for InvalidToken {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "invalid token: {}", self.token)
-    }
-}
+use rlox_macros::{rlox_error, rlox_error_enum};
+use super::ReportError;
 
 #[derive(Debug)]
-pub struct UnterminatedString {
-    pub line: usize,
-    pub column: usize,
-    pub line_text: Option<String>,
-}
-
-impl Error for UnterminatedString {}
-
-impl Display for UnterminatedString {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "unterminated string literal")
-    }
-}
+#[rlox_error]
+pub struct InvalidToken {}
 
 #[derive(Debug)]
-pub struct UnterminatedComment {
-    pub line: usize,
-    pub column: usize,
-    pub line_text: Option<String>,
-}
+#[rlox_error]
+pub struct UnterminatedString {}
 
-impl Error for UnterminatedComment {}
 
-impl Display for UnterminatedComment {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "unterminated comment block")
-    }
-}
+#[derive(Debug)]
+#[rlox_error("unterminated comment")]
+pub struct UnterminatedComment {}
 
+#[rlox_error_enum]
 pub enum ScannerError {
     TokenError(InvalidToken),
     StringError(UnterminatedString),
     CommentError(UnterminatedComment),
 }
 
-impl From<InvalidToken> for ScannerError {
-    fn from(value: InvalidToken) -> Self {
-        ScannerError::TokenError(value)
-    }
-}
-
-impl From<UnterminatedString> for ScannerError {
-    fn from(value: UnterminatedString) -> Self {
-        ScannerError::StringError(value)
-    }
-}
-
-impl From<UnterminatedComment> for ScannerError {
-    fn from(value: UnterminatedComment) -> Self {
-        ScannerError::CommentError(value)
-    }
-}
 
 impl ScannerError {
     pub fn invalid_token(
         line: usize,
         column: usize,
-        token: String,
-        line_text: Option<String>,
+        msg: String,
     ) -> Self {
         ScannerError::TokenError(InvalidToken {
-            token,
+            msg,
             line,
             column,
-            line_text,
         })
     }
 
-    pub fn unterminated_string(line: usize, column: usize, line_text: Option<String>) -> Self {
+    pub fn unterminated_string(line: usize, column: usize, msg: String) -> Self {
         ScannerError::StringError(UnterminatedString {
             line,
             column,
-            line_text,
+            msg
         })
     }
 
-    pub fn unterminated_comment(line: usize, column: usize, line_text: Option<String>) -> Self {
+    pub fn unterminated_comment(line: usize, column: usize, msg: String) -> Self {
         ScannerError::CommentError(UnterminatedComment {
             line,
             column,
-            line_text,
+            msg,
         })
     }
 }
