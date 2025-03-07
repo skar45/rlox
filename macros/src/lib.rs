@@ -43,18 +43,6 @@ pub fn rlox_error(attr: TokenStream, item: TokenStream) -> TokenStream {
                 }
             }
         }
-
-        impl ReportError for #struct_name {
-            fn get_line(&self) -> usize {
-                self.line
-            }
-            fn get_column(&self) -> usize {
-                self.column
-            }
-            fn get_msg(&self) -> &str {
-               &self.msg
-            }
-        }
     };
 
     output.into()
