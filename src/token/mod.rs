@@ -38,6 +38,7 @@ pub enum TokenType {
     True,
     Var,
     While,
+    Break,
     Eof,
 }
 
@@ -66,6 +67,7 @@ impl TokenType {
             "var" => TokenType::Var,
             "while" => TokenType::While,
             "fun" => TokenType::Fun,
+            "break" => TokenType::Break,
             _ => TokenType::Identifier,
         }
     }

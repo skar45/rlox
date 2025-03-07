@@ -1,7 +1,7 @@
 use crate::{
     ast::{
         expr::Expr,
-        stmt::{ForStmtInitializer, Stmt},
+        stmt::{BreakStmt, ForStmtInitializer, Stmt},
     },
     errors::parser_errors::ParserError,
     token::{LiteralValue, Token, TokenType},
@@ -311,17 +311,16 @@ impl Parser {
 
     fn if_statment(&mut self) -> ParseStmtResult {
         if self.peek().r#type != TokenType::LeftParen {
-            return Err(self.stmt_error("missing \")\""));
+            return Err(self.stmt_error("missing \"(\""));
         }
-
+        self.advance();
         let condition = self.expression()?;
-
-        if self.advance().r#type != TokenType::RightParen {
+        if self.previous().r#type != TokenType::RightParen {
             return Err(self.stmt_error("missing \")\""));
         }
 
         let then_branch = self.statement()?;
-        self.advance();
+        // self.advance();
         let else_branch = match self.previous().r#type {
             TokenType::Else => {
                 self.advance();
@@ -375,7 +374,6 @@ impl Parser {
             },
         };
 
-
         let condition = match self.peek().r#type {
             TokenType::Semicolon => None,
             _ => Some(self.expression()?),
@@ -418,7 +416,7 @@ impl Parser {
                     if params.len() < 256 {
                         params.push(token.clone());
                     } else {
-                        return Err(self.stmt_error("function arguments cannot be more that 255"));
+                        return Err(self.stmt_error("cannot have more than 255 arguments"));
                     }
                 }
                 _ => return Err(self.stmt_error("invalid function param")),
@@ -435,12 +433,22 @@ impl Parser {
     fn return_statement(&mut self) -> ParseStmtResult {
         let keyword = self.previous().clone();
         let mut value = None;
-        if self.peek().r#type != TokenType::Semicolon { value = Some(self.expression()?); }
+        if self.peek().r#type != TokenType::Semicolon {
+            value = Some(self.expression()?);
+        }
         if self.peek().r#type != TokenType::Semicolon {
             return Err(self.missing_semicolon());
         }
         self.advance();
         Ok(Stmt::return_stmt(keyword, value))
+    }
+
+    fn break_statment(&mut self) -> ParseStmtResult {
+        if self.peek().r#type != TokenType::Semicolon {
+            return Err(self.missing_semicolon());
+        }
+        self.advance();
+        Ok(Stmt::BreakStmt(BreakStmt {}))
     }
 
     fn statement(&mut self) -> ParseStmtResult {
@@ -472,6 +480,10 @@ impl Parser {
             TokenType::Return => {
                 self.advance();
                 Ok(self.return_statement()?)
+            }
+            TokenType::Break => {
+                self.advance();
+                Ok(self.break_statment()?)
             }
             _ => self.expression_statement(),
         }

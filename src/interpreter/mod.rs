@@ -2,20 +2,25 @@ use std::mem;
 
 use crate::{
     ast::{expr::*, stmt::*},
-    environment::{Environment, RcEnvironment},
+    environment::Environment,
     token::{LiteralValue, TokenType},
 };
 
+enum LoopState {
+    Break,
+    Continue,
+}
+
 pub struct Interpreter {
-    current_env: RcEnvironment,
-    _global: RcEnvironment,
+    current_env: Environment,
+    loop_state: Option<LoopState>,
 }
 
 impl Interpreter {
-    pub fn new(env: RcEnvironment) -> Self {
+    pub fn new(env: Environment) -> Self {
         Interpreter {
-            current_env: env.clone(),
-            _global: env,
+            current_env: env,
+            loop_state: None,
         }
     }
     fn is_truthy(&self, value: &LiteralValue) -> bool {
@@ -106,21 +111,19 @@ impl Interpreter {
     }
 
     fn eval_variable(&mut self, expr: &Variable) -> LiteralValue {
-        match Environment::get_var(&mut self.current_env, &expr.name.lexme) {
+        match self.current_env.get_var(&expr.name.lexme) {
             Some(v) => v.clone(),
-            None => LiteralValue::Nil,
+            None => LiteralValue::Nil
         }
     }
 
     fn eval_assign(&mut self, expr: &Assign) -> LiteralValue {
-        let check = Environment::check(&mut self.current_env, &expr.name.lexme);
+        let check = self.current_env.check(&expr.name.lexme);
         if !check {
             todo!("runtime error")
         }
         let value = self.evaluate(&expr.value);
-        if let Err(_) =
-            Environment::assign_var(&mut self.current_env, expr.name.lexme.clone(), value)
-        {
+        if let Err(_) = self.current_env.assign_var(expr.name.lexme.clone(), value) {
             todo!("runtime error")
         }
         LiteralValue::Nil
@@ -154,17 +157,14 @@ impl Interpreter {
         for arg in &expr.args {
             args.push(self.evaluate(&arg));
         }
-        let rlox_fn = Environment::get_fn(&mut self.current_env, &expr.callee);
+        let rlox_fn = self.current_env.get_fn(&expr.callee);
         if let Some(fun) = rlox_fn {
             let mut env = Environment::new();
-            Environment::add_enclosing(&mut env, self.current_env);
+            env.add_enclosing(&self.current_env);
             let prev = mem::replace(&mut self.current_env, env);
             for (i, param) in fun.params.iter().enumerate() {
-                Environment::define_var(
-                    &mut self.current_env,
-                    param.lexme.clone(),
-                    args[i].clone(),
-                );
+                self.current_env
+                    .define_var(param.lexme.clone(), args[i].clone());
             }
             for stmt in &fun.body {
                 match stmt {
@@ -175,10 +175,7 @@ impl Interpreter {
                     s => self.execute(&s),
                 }
             }
-            let mut d_env = mem::replace(&mut self.current_env, prev);
-            unsafe {
-                let _ = mem::drop(Box::from_raw(d_env.as_mut()));
-            }
+            let _ = mem::replace(&mut self.current_env, prev);
         } else {
             todo!("interpreter error")
         }
@@ -209,20 +206,17 @@ impl Interpreter {
 
     fn define_var_stmt(&mut self, stmt: &VarStmt) {
         let value = self.evaluate(&stmt.initializer);
-        Environment::define_var(&mut self.current_env, stmt.name.lexme.clone(), value);
+        self.current_env.define_var(stmt.name.lexme.clone(), value);
     }
 
     fn execute_block(&mut self, stmt: &BlockStmt) {
         let mut new_env = Environment::new();
-        Environment::add_enclosing(&mut new_env, self.current_env);
+        new_env.add_enclosing(&self.current_env);
         let prev = mem::replace(&mut self.current_env, new_env);
         for s in &stmt.statements {
             self.execute(s);
         }
-        let mut d_env = mem::replace(&mut self.current_env, prev);
-        unsafe {
-            let _ = mem::drop(Box::from_raw(d_env.as_mut()));
-        }
+        let _ = mem::replace(&mut self.current_env, prev);
     }
 
     fn execute_if_stmt(&mut self, stmt: &IfStmt) {
@@ -239,6 +233,10 @@ impl Interpreter {
     fn execute_while_stmt(&mut self, stmt: &WhileStmt) {
         let mut condition = self.evaluate(&stmt.condition);
         while self.is_truthy(&condition) {
+            if let Some(_s) = &self.loop_state {
+                self.loop_state = None;
+                break;
+            }
             let body = &stmt.body;
             self.execute(body);
             condition = self.evaluate(&stmt.condition);
@@ -255,6 +253,10 @@ impl Interpreter {
         if let Some(c) = &stmt.condition {
             let mut condition = self.evaluate(c);
             while self.is_truthy(&condition) {
+                if let Some(_s) = &self.loop_state {
+                    self.loop_state = None;
+                    break;
+                }
                 let body = &stmt.body;
                 self.execute(body);
                 if let Some(a) = &stmt.afterthought {
@@ -266,7 +268,8 @@ impl Interpreter {
     }
 
     fn declare_fn(&mut self, stmt: &FnStmt) {
-        Environment::define_fn(&mut self.current_env, stmt.name.lexme.clone(), stmt.clone());
+        self.current_env
+            .define_fn(stmt.name.lexme.clone(), stmt.clone());
     }
 
     fn execute_return_stmt(&mut self, stmt: &ReturnStmt) -> LiteralValue {
@@ -274,6 +277,10 @@ impl Interpreter {
             Some(v) => self.evaluate(v),
             None => LiteralValue::Nil,
         }
+    }
+
+    fn execute_break_stmt(&mut self, _stmt: &BreakStmt) {
+        self.loop_state = Some(LoopState::Break);
     }
 
     fn execute(&mut self, stmt: &Stmt) {
@@ -286,6 +293,7 @@ impl Interpreter {
             Stmt::WhileStmt(w) => self.execute_while_stmt(w),
             Stmt::ForStmt(f) => self.execute_for_stmt(f),
             Stmt::FnStmt(f) => self.declare_fn(f),
+            Stmt::BreakStmt(f) => self.execute_break_stmt(f),
             Stmt::ReturnStmt(r) => {
                 self.execute_return_stmt(r);
             }

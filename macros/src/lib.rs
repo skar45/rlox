@@ -29,7 +29,7 @@ pub fn rlox_error(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let struct_name = &input.ident;
 
-    let output =  quote! {
+    let output = quote! {
         #input
 
         impl Error for #struct_name {}
@@ -64,7 +64,8 @@ pub fn rlox_error(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn rlox_error_enum(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(item as DeriveInput);
     let enum_name = &input.ident;
-    let mut variant_impls = Vec::new();
+    let mut variant_impls_from = Vec::new();
+    let mut variants = Vec::new();
 
     if let Data::Enum(ref mut enum_data) = input.data {
         for variant in &enum_data.variants {
@@ -72,6 +73,7 @@ pub fn rlox_error_enum(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 if let Some(field) = fields.unnamed.first() {
                     let variant_name = &variant.ident;
                     let struct_type = &field.ty;
+                    variants.push(variant_name);
 
                     let impl_block = quote! {
                         impl From<#struct_type> for #enum_name {
@@ -81,7 +83,33 @@ pub fn rlox_error_enum(_attr: TokenStream, item: TokenStream) -> TokenStream {
                         }
                     };
 
-                    variant_impls.push(impl_block);
+                    variant_impls_from.push(impl_block);
+                }
+            }
+        }
+    };
+
+    let impl_rep_err = quote! {
+        impl ReportError for #enum_name {
+            fn get_line(&self) -> usize {
+                match self {
+                    #(
+                        #enum_name::#variants(value) => value.line
+                    ),*
+                }
+            }
+            fn get_column(&self) -> usize {
+                match self {
+                    #(
+                        #enum_name::#variants(value) => value.column
+                    ),*
+                }
+            }
+            fn get_msg(&self) -> &str {
+                match self {
+                    #(
+                        #enum_name::#variants(value) => &value.msg
+                    ),*
                 }
             }
         }
@@ -90,7 +118,8 @@ pub fn rlox_error_enum(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let output = quote! {
         #input
 
-        #(#variant_impls)*
+        #(#variant_impls_from)*
+        #impl_rep_err
     };
     output.into()
 }

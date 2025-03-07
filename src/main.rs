@@ -13,7 +13,7 @@ use std::{
 };
 
 use environment::Environment;
-use errors::{parser_errors::ParserError, scanner_errors::ScannerError, ReportError};
+use errors::ReportError;
 use interpreter::Interpreter;
 use lexer::scanner::Scanner;
 use parser::Parser;
@@ -28,29 +28,26 @@ impl Rlox {
     }
 
     fn run(&mut self, source: String) {
+        let line_text = source.split("\n").collect::<Vec<&str>>();
         // Lex
         let mut scanner = Scanner::new(source.clone());
-        if let Err(_e) = scanner.scan_tokens() {
+        if let Err(error) = scanner.scan_tokens() {
+            self.report_error(&error, line_text[error.get_line()]);
             process::exit(0x41);
         }
         // Parse
         let mut parser = Parser::new(scanner.tokens);
         let (parsed_stmts, parser_errors) = parser.parse();
-        let line_text = source.split("\n").collect::<Vec<&str>>();
         for error in parser_errors {
-            self.report_error(error, line_text[error.get_line()]);
+            self.report_error(&error, line_text[error.get_line()]);
         }
         if self.had_error {
             process::exit(0x41)
         };
         // Interpret
-        let mut env = Environment::new();
+        let env = Environment::new();
         let mut interpreter = Interpreter::new(env);
         interpreter.interpret(parsed_stmts);
-        // clean up env to prevent memory leak
-        unsafe {
-            let _ = std::mem::drop(Box::from_raw(env.as_mut()));
-        }
     }
 
     pub fn run_prompt(&mut self) {
@@ -80,7 +77,7 @@ impl Rlox {
         }
     }
 
-    fn report_error<E: ReportError>(&mut self, error: E, text: &str)  {
+    fn report_error(&mut self, error: &impl ReportError, text: &str) {
         let column = error.get_column();
         let line = error.get_line();
         let message = error.get_msg();

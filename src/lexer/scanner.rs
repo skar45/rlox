@@ -258,27 +258,15 @@ impl Scanner {
     }
 
     fn invalid_token(&self, token: char) -> ScannerError {
-        ScannerError::invalid_token(
-            self.line,
-            self.current_column,
-            token.to_string(),
-        )
+        ScannerError::invalid_token(self.line, self.current_column, token.to_string())
     }
 
     fn unterminated_string(&self) -> ScannerError {
-        ScannerError::unterminated_string(
-            self.line,
-            self.current_column,
-            self.get_line_text(),
-        )
+        ScannerError::unterminated_string(self.line, self.current_column, self.get_line_text())
     }
 
     fn unterminated_comment(&self) -> ScannerError {
-        ScannerError::unterminated_comment(
-            self.line,
-            self.current_column,
-            self.get_line_text(),
-        )
+        ScannerError::unterminated_comment(self.line, self.current_column, self.get_line_text())
     }
 
     fn get_line_text(&self) -> String {

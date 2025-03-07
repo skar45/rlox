@@ -1,7 +1,7 @@
 use std::{error::Error, fmt::Display, usize};
 
-use rlox_macros::{rlox_error, rlox_error_enum};
 use super::ReportError;
+use rlox_macros::{rlox_error, rlox_error_enum};
 
 #[derive(Debug)]
 #[rlox_error]
