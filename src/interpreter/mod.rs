@@ -4,36 +4,30 @@ use crate::{
     ast::{expr::*, stmt::*},
     environment::Environment,
     errors::interpreter_errors::RuntimeError,
-    token::{LiteralValue, TokenType},
+    token::{LiteralValue, Token, TokenType},
 };
 
 type EvalExprResult = Result<LiteralValue, RuntimeError>;
 type EvalStmtResult = Result<(), RuntimeError>;
 
-enum LoopState {
-    Break,
-    Continue,
-}
 
 pub struct Interpreter {
     current_env: Environment,
-    loop_state: Option<LoopState>,
 }
 
 impl Interpreter {
     pub fn new(env: Environment) -> Self {
         Interpreter {
             current_env: env,
-            loop_state: None,
         }
     }
 
-    fn value_error(&self, message: &str) -> RuntimeError {
-        RuntimeError::value_error(0, 0, message.to_string())
+    fn value_error(&self, message: &str, token: &Token) -> RuntimeError {
+        RuntimeError::value_error(token.line, token.column, message.to_string())
     }
 
-    fn expression_error(&self, message: &str) -> RuntimeError {
-        RuntimeError::expression_error(0, 0, message.to_string())
+    fn expression_error(&self, message: &str, token: &Token) -> RuntimeError {
+        RuntimeError::expression_error(token.line, token.column, message.to_string())
     }
 
     fn is_truthy(&self, value: &LiteralValue) -> bool {
@@ -135,13 +129,13 @@ impl Interpreter {
         let check = self.current_env.check(var_name);
         if !check {
             return Err(
-                self.value_error(&format!("cannot find variable {} in this scope", var_name))
+                self.value_error(&format!("cannot find variable {} in this scope", var_name), &expr.name)
             );
         }
         let value = self.evaluate(&expr.value)?;
         if let Err(_) = self.current_env.assign_var(var_name.clone(), value) {
             return Err(
-                self.value_error(&format!("cannot assign value to {} in this scope", var_name))
+                self.value_error(&format!("cannot assign value to {} in this scope", var_name), &expr.name)
             );
         }
         Ok(LiteralValue::Nil)
@@ -166,7 +160,7 @@ impl Interpreter {
                 }
             }
             _ => Err(
-                self.expression_error(&format!("invalid logical operator {}", expr.operator.lexme))
+                self.expression_error(&format!("invalid logical operator {}", expr.operator.lexme), &expr.operator)
             )
         }
     }
@@ -198,7 +192,7 @@ impl Interpreter {
             let _ = mem::replace(&mut self.current_env, prev);
         } else {
             return Err(
-                self.value_error(&format!("cannot find function {} in this scope", &expr.callee))
+                self.value_error(&format!("cannot find function {} in this scope", &expr.callee), &expr.paren)
             );
         }
         Ok(ret_val)
@@ -260,10 +254,6 @@ impl Interpreter {
     fn execute_while_stmt(&mut self, stmt: &WhileStmt) -> EvalStmtResult {
         let mut condition = self.evaluate(&stmt.condition)?;
         while self.is_truthy(&condition) {
-            if let Some(_s) = &self.loop_state {
-                self.loop_state = None;
-                break;
-            }
             let body = &stmt.body;
             self.execute(body)?;
             condition = self.evaluate(&stmt.condition)?;
@@ -281,10 +271,6 @@ impl Interpreter {
         if let Some(c) = &stmt.condition {
             let mut condition = self.evaluate(c)?;
             while self.is_truthy(&condition) {
-                if let Some(_s) = &self.loop_state {
-                    self.loop_state = None;
-                    break;
-                }
                 let body = &stmt.body;
                 self.execute(body)?;
                 if let Some(a) = &stmt.afterthought {
@@ -310,7 +296,6 @@ impl Interpreter {
     }
 
     fn execute_break_stmt(&mut self, _stmt: &BreakStmt) -> EvalStmtResult {
-        self.loop_state = Some(LoopState::Break);
         Ok(())
     }
 
