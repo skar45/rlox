@@ -283,7 +283,16 @@ impl Interpreter {
         let mut condition = self.evaluate(&stmt.condition)?;
         while self.is_truthy(&condition) {
             let body = &stmt.body;
-            self.execute(body)?;
+            if let Err(e) = self.execute(body) {
+                match &e {
+                    RuntimeState::Cf(c) => match c {
+                        ControlFlow::Break => break,
+                        ControlFlow::Continue => (),
+                        _ => return Err(e),
+                    },
+                    _ => return Err(e),
+                }
+            };
             condition = self.evaluate(&stmt.condition)?;
         }
         Ok(())
@@ -300,7 +309,16 @@ impl Interpreter {
             let mut condition = self.evaluate(c)?;
             while self.is_truthy(&condition) {
                 let body = &stmt.body;
-                self.execute(body)?;
+                if let Err(e) = self.execute(body) {
+                    match &e {
+                        RuntimeState::Cf(c) => match c {
+                            ControlFlow::Break => break,
+                            ControlFlow::Continue => (),
+                            _ => return Err(e),
+                        },
+                        _ => return Err(e),
+                    }
+                };
                 if let Some(a) = &stmt.afterthought {
                     self.evaluate(a)?;
                 }
