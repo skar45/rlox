@@ -47,7 +47,7 @@ impl Rlox {
         // Interpret
         let env = Environment::new();
         let mut interpreter = Interpreter::new(env);
-        interpreter.interpret(parsed_stmts);
+        let _ = interpreter.interpret(parsed_stmts);
     }
 
     pub fn run_prompt(&mut self) {

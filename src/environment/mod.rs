@@ -8,19 +8,26 @@ pub struct Environment {
     scope: NonNullScope,
 }
 
+enum ScopeContext {
+    Loop,
+    Function,
+}
+
 pub struct Scope {
-    var_values: HashMap<String, LiteralValue>,
+    var_dcls: HashMap<String, LiteralValue>,
     fn_dcls: HashMap<String, FnStmt>,
     pub enclosing: Option<NonNullScope>,
+    context: Option<ScopeContext>,
 }
 
 impl Environment {
     pub fn new() -> Environment {
         let scope = unsafe {
             NonNull::new_unchecked(Box::into_raw(Box::new(Scope {
-                var_values: HashMap::new(),
+                var_dcls: HashMap::new(),
                 fn_dcls: HashMap::new(),
                 enclosing: None,
+                context: None,
             })))
         };
         Environment { scope }
@@ -38,7 +45,7 @@ impl Environment {
         let mut env = self.scope;
         unsafe {
             let mut_env = env.as_mut();
-            mut_env.var_values.insert(name, value);
+            mut_env.var_dcls.insert(name, value);
         }
     }
 
@@ -47,8 +54,8 @@ impl Environment {
         unsafe {
             loop {
                 let mut_env = env.as_mut();
-                if mut_env.var_values.contains_key(&name) {
-                    mut_env.var_values.insert(name, value);
+                if mut_env.var_dcls.contains_key(&name) {
+                    mut_env.var_dcls.insert(name, value);
                     return Ok(());
                 } else {
                     match mut_env.enclosing {
@@ -73,7 +80,7 @@ impl Environment {
         unsafe {
             loop {
                 let mut_env = env.as_mut();
-                match mut_env.var_values.get(name) {
+                match mut_env.var_dcls.get(name) {
                     Some(v) => return Some(v),
                     None => match mut_env.enclosing {
                         Some(e) => env = e,
@@ -105,7 +112,7 @@ impl Environment {
         unsafe {
             loop {
                 let mut_env = env.as_mut();
-                match mut_env.var_values.contains_key(name) {
+                match mut_env.var_dcls.contains_key(name) {
                     true => return true,
                     false => match mut_env.enclosing {
                         Some(e) => env = e,

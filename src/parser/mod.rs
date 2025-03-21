@@ -1,7 +1,7 @@
 use crate::{
     ast::{
         expr::Expr,
-        stmt::{BreakStmt, ForStmtInitializer, Stmt},
+        stmt::{BreakStmt, ContStmt, ForStmtInitializer, Stmt},
     },
     errors::parser_errors::ParserError,
     token::{LiteralValue, Token, TokenType},
@@ -443,12 +443,20 @@ impl Parser {
         Ok(Stmt::return_stmt(keyword, value))
     }
 
-    fn break_statment(&mut self) -> ParseStmtResult {
+    fn break_statement(&mut self) -> ParseStmtResult {
         if self.peek().r#type != TokenType::Semicolon {
             return Err(self.missing_semicolon());
         }
         self.advance();
         Ok(Stmt::BreakStmt(BreakStmt {}))
+    }
+
+    fn continue_statement(&mut self) -> ParseStmtResult {
+        if self.peek().r#type != TokenType::Semicolon {
+            return Err(self.missing_semicolon());
+        }
+        self.advance();
+        Ok(Stmt::ContStmt(ContStmt {}))
     }
 
     fn statement(&mut self) -> ParseStmtResult {
@@ -483,7 +491,11 @@ impl Parser {
             }
             TokenType::Break => {
                 self.advance();
-                Ok(self.break_statment()?)
+                Ok(self.break_statement()?)
+            }
+            TokenType::Continue => {
+                self.advance();
+                Ok(self.continue_statement()?)
             }
             _ => self.expression_statement(),
         }

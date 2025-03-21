@@ -7,9 +7,31 @@ use crate::{
     token::{LiteralValue, Token, TokenType},
 };
 
-type EvalExprResult = Result<LiteralValue, RuntimeError>;
-type EvalStmtResult = Result<(), RuntimeError>;
+enum ControlFlow {
+    Continue,
+    Break,
+    Return(LiteralValue),
+}
 
+enum RuntimeState {
+    Cf(ControlFlow),
+    RtErr(RuntimeError),
+}
+
+impl From<RuntimeError> for RuntimeState {
+    fn from(value: RuntimeError) -> Self {
+        RuntimeState::RtErr(value)
+    }
+}
+
+impl From<ControlFlow> for RuntimeState {
+    fn from(value: ControlFlow) -> Self {
+        RuntimeState::Cf(value)
+    }
+}
+
+type EvalExprResult = Result<LiteralValue, RuntimeState>;
+type EvalStmtResult = Result<(), RuntimeState>;
 
 pub struct Interpreter {
     current_env: Environment,
@@ -17,17 +39,17 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new(env: Environment) -> Self {
-        Interpreter {
-            current_env: env,
-        }
+        Interpreter { current_env: env }
     }
 
-    fn value_error(&self, message: &str, token: &Token) -> RuntimeError {
-        RuntimeError::value_error(token.line, token.column, message.to_string())
+    fn value_error(&self, message: &str, token: &Token) -> RuntimeState {
+        let e = RuntimeError::value_error(token.line, token.column, message.to_string());
+        RuntimeState::RtErr(e)
     }
 
-    fn expression_error(&self, message: &str, token: &Token) -> RuntimeError {
-        RuntimeError::expression_error(token.line, token.column, message.to_string())
+    fn expression_error(&self, message: &str, token: &Token) -> RuntimeState {
+        let e = RuntimeError::expression_error(token.line, token.column, message.to_string());
+        RuntimeState::RtErr(e)
     }
 
     fn is_truthy(&self, value: &LiteralValue) -> bool {
@@ -128,15 +150,17 @@ impl Interpreter {
         let var_name = &expr.name.lexme;
         let check = self.current_env.check(var_name);
         if !check {
-            return Err(
-                self.value_error(&format!("cannot find variable {} in this scope", var_name), &expr.name)
-            );
+            return Err(self.value_error(
+                &format!("cannot find variable {} in this scope", var_name),
+                &expr.name,
+            ));
         }
         let value = self.evaluate(&expr.value)?;
         if let Err(_) = self.current_env.assign_var(var_name.clone(), value) {
-            return Err(
-                self.value_error(&format!("cannot assign value to {} in this scope", var_name), &expr.name)
-            );
+            return Err(self.value_error(
+                &format!("cannot assign value to {} in this scope", var_name),
+                &expr.name,
+            ));
         }
         Ok(LiteralValue::Nil)
     }
@@ -159,9 +183,10 @@ impl Interpreter {
                     Ok(LiteralValue::Bool(false))
                 }
             }
-            _ => Err(
-                self.expression_error(&format!("invalid logical operator {}", expr.operator.lexme), &expr.operator)
-            )
+            _ => Err(self.expression_error(
+                &format!("invalid logical operator {}", expr.operator.lexme),
+                &expr.operator,
+            )),
         }
     }
 
@@ -181,19 +206,22 @@ impl Interpreter {
                     .define_var(param.lexme.clone(), args[i].clone());
             }
             for stmt in &fun.body {
-                match stmt {
-                    Stmt::ReturnStmt(r) => {
-                        ret_val = self.execute_return_stmt(&r)?;
-                        break;
-                    }
-                    s => self.execute(&s)?,
-                }
+                if let Err(e) = self.execute(stmt) {
+                    match e {
+                        RuntimeState::Cf(c) => match c {
+                            ControlFlow::Return(v) => ret_val = v,
+                            _ => (),
+                        },
+                        _ => return Err(e),
+                    };
+                };
             }
             let _ = mem::replace(&mut self.current_env, prev);
         } else {
-            return Err(
-                self.value_error(&format!("cannot find function {} in this scope", &expr.callee), &expr.paren)
-            );
+            return Err(self.value_error(
+                &format!("cannot find function {} in this scope", &expr.callee),
+                &expr.paren,
+            ));
         }
         Ok(ret_val)
     }
@@ -266,7 +294,7 @@ impl Interpreter {
             match &i {
                 ForStmtInitializer::VarDecl(v) => self.define_var_stmt(v)?,
                 ForStmtInitializer::ExprStmt(e) => self.eval_expression_stmt(e)?,
-            }
+            };
         }
         if let Some(c) = &stmt.condition {
             let mut condition = self.evaluate(c)?;
@@ -283,20 +311,26 @@ impl Interpreter {
     }
 
     fn declare_fn(&mut self, stmt: &FnStmt) -> EvalStmtResult {
-        Ok(self
-            .current_env
-            .define_fn(stmt.name.lexme.clone(), stmt.clone()))
+        self.current_env
+            .define_fn(stmt.name.lexme.clone(), stmt.clone());
+        Ok(())
     }
 
-    fn execute_return_stmt(&mut self, stmt: &ReturnStmt) -> EvalExprResult {
-        Ok(match &stmt.value {
+    fn execute_return_stmt(&mut self, stmt: &ReturnStmt) -> EvalStmtResult {
+        let val = match &stmt.value {
             Some(v) => self.evaluate(v)?,
             None => LiteralValue::Nil,
-        })
+        };
+
+        Err(RuntimeState::Cf(ControlFlow::Return(val)))
     }
 
     fn execute_break_stmt(&mut self, _stmt: &BreakStmt) -> EvalStmtResult {
-        Ok(())
+        Err(RuntimeState::Cf(ControlFlow::Break))
+    }
+
+    fn execute_cont_stmt(&mut self, _stmt: &ContStmt) -> EvalStmtResult {
+        Err(RuntimeState::Cf(ControlFlow::Continue))
     }
 
     fn execute(&mut self, stmt: &Stmt) -> EvalStmtResult {
@@ -310,16 +344,20 @@ impl Interpreter {
             Stmt::ForStmt(f) => self.execute_for_stmt(f),
             Stmt::FnStmt(f) => self.declare_fn(f),
             Stmt::BreakStmt(f) => self.execute_break_stmt(f),
-            Stmt::ReturnStmt(r) => {
-                self.execute_return_stmt(r)?;
-                Ok(())
-            }
+            Stmt::ContStmt(f) => self.execute_cont_stmt(f),
+            Stmt::ReturnStmt(r) => self.execute_return_stmt(r),
         }
     }
 
-    pub fn interpret(&mut self, statements: Vec<Stmt>) {
+    pub fn interpret(&mut self, statements: Vec<Stmt>) -> Result<(), RuntimeError> {
         for statement in statements {
-            let _ = self.execute(&statement);
+            if let Err(e) = self.execute(&statement) {
+                match e {
+                    RuntimeState::RtErr(e) => return Err(e),
+                    _ => (),
+                }
+            };
         }
+        Ok(())
     }
 }

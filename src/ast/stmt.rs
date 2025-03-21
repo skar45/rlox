@@ -14,6 +14,7 @@ pub enum Stmt {
     FnStmt(FnStmt),
     ReturnStmt(ReturnStmt),
     BreakStmt(BreakStmt),
+    ContStmt(ContStmt),
 }
 
 #[derive(Clone)]
@@ -74,6 +75,9 @@ pub struct ReturnStmt {
 
 #[derive(Clone)]
 pub struct BreakStmt {}
+
+#[derive(Clone)]
+pub struct ContStmt {}
 
 impl Stmt {
     pub fn var(name: Token, initializer: Option<Expr>) -> Self {
