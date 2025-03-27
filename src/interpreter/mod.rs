@@ -209,7 +209,10 @@ impl Interpreter {
                 if let Err(e) = self.execute(stmt) {
                     match e {
                         RuntimeState::Cf(c) => match c {
-                            ControlFlow::Return(v) => ret_val = v,
+                            ControlFlow::Return(v) => {
+                                ret_val = v;
+                                break;
+                            },
                             _ => (),
                         },
                         _ => return Err(e),

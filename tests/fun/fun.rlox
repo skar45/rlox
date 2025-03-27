@@ -23,6 +23,16 @@ fun nestedFunction(a) {
     nested(b);
 }
 
+fun retFunction() {
+    var a = 20;
+    for (var i = 0; i < a; i = i + 1) {
+	if ((i * 5) == a) {
+	    return i;
+	}
+    }
+    return -1;
+}
+
 var a = "Hello";
 var b = "World!";
 printVal(a + " " + b);
@@ -31,3 +41,4 @@ globalCheck(a);
 var c = 2;
 scopeCheck(c);
 nestedFunction("foo");
+printVal(retFunction());

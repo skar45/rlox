@@ -315,12 +315,11 @@ impl Parser {
         }
         self.advance();
         let condition = self.expression()?;
-        if self.previous().r#type != TokenType::RightParen {
+        if self.peek().r#type != TokenType::RightParen {
             return Err(self.stmt_error("missing \")\""));
         }
-
+        self.advance();
         let then_branch = self.statement()?;
-        // self.advance();
         let else_branch = match self.previous().r#type {
             TokenType::Else => {
                 self.advance();
