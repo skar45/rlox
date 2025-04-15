@@ -35,12 +35,15 @@ type EvalStmtResult = Result<(), RuntimeState>;
 
 pub struct Interpreter {
     current_env: Environment,
-    locals: HashMap<String, usize>
+    locals: HashMap<String, usize>,
 }
 
 impl Interpreter {
     pub fn new(env: Environment) -> Self {
-        Interpreter { current_env: env, locals: HashMap::new() }
+        Interpreter {
+            current_env: env,
+            locals: HashMap::new(),
+        }
     }
 
     fn value_error(&self, message: &str, token: &Token) -> RuntimeState {
@@ -145,21 +148,17 @@ impl Interpreter {
             Some(d) => {
                 let res = self.current_env.get_at(*d, name.lexme.clone());
                 match res {
-                    Ok(value) => {
-                        match value {
-                            Some(v) => Ok(v.clone()),
-                            None => Ok(LiteralValue::Nil)
-                        }
+                    Ok(value) => match value {
+                        Some(v) => Ok(v.clone()),
+                        None => Ok(LiteralValue::Nil),
                     },
-                    Err(_) => Ok(LiteralValue::Nil)
-                }
-            },
-            None => {
-                match self.current_env.get_var(&name.lexme) {
-                    Some(v) => Ok(v.clone()),
-                    None => Ok(LiteralValue::Nil)
+                    Err(_) => Ok(LiteralValue::Nil),
                 }
             }
+            None => match self.current_env.get_var(&name.lexme) {
+                Some(v) => Ok(v.clone()),
+                None => Ok(LiteralValue::Nil),
+            },
         }
     }
 
@@ -181,13 +180,13 @@ impl Interpreter {
         let distance = self.locals.get(&expr.to_string());
         match distance {
             Some(d) => {
-                if let Err(_) = self.current_env.assign_at(*d, var_name.clone(), value) { 
+                if let Err(_) = self.current_env.assign_at(*d, var_name.clone(), value) {
                     return Err(self.value_error(
                         &format!("cannot assign value to {} in this scope", var_name),
                         &expr.name,
                     ));
                 }
-            },
+            }
             None => {
                 if let Err(_) = self.current_env.assign_var(var_name.clone(), value) {
                     return Err(self.value_error(
@@ -247,7 +246,7 @@ impl Interpreter {
                             ControlFlow::Return(v) => {
                                 ret_val = v;
                                 break;
-                            },
+                            }
                             _ => (),
                         },
                         _ => return Err(e),

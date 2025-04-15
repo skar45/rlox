@@ -8,7 +8,6 @@ pub struct Environment {
     scope: NonNullScope,
 }
 
-
 pub struct Scope {
     var_dcls: HashMap<String, LiteralValue>,
     fn_dcls: HashMap<String, FnStmt>,
@@ -35,26 +34,35 @@ impl Environment {
         }
     }
 
-    pub fn get_at<'a>(&mut self, distance: usize, name: String) -> Result<Option<&'a LiteralValue>, ()> {
+    pub fn get_at<'a>(
+        &mut self,
+        distance: usize,
+        name: String,
+    ) -> Result<Option<&'a LiteralValue>, ()> {
         unsafe {
             let mut env = self.scope.as_mut();
             for _ in 0..distance {
                 match env.enclosing {
                     Some(mut e) => env = e.as_mut(),
-                    None => return Err(())
+                    None => return Err(()),
                 }
             }
             Ok(env.var_dcls.get(&name))
         }
     }
 
-    pub fn assign_at<'a>(&mut self, distance: usize, name: String, value: LiteralValue) -> Result<(), ()> {
+    pub fn assign_at<'a>(
+        &mut self,
+        distance: usize,
+        name: String,
+        value: LiteralValue,
+    ) -> Result<(), ()> {
         unsafe {
             let mut env = self.scope.as_mut();
             for _ in 0..distance {
                 match env.enclosing {
                     Some(mut e) => env = e.as_mut(),
-                    None => return Err(())
+                    None => return Err(()),
                 }
             }
             env.var_dcls.insert(name, value);

@@ -2,9 +2,9 @@ mod ast;
 mod environment;
 mod errors;
 mod interpreter;
-mod resolver;
 mod lexer;
 mod parser;
+mod resolver;
 mod token;
 
 use std::{

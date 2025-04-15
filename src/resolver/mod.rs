@@ -1,17 +1,21 @@
 use std::collections::HashMap;
 
-use crate::{ast::{expr::*, stmt::*}, interpreter::Interpreter, token::Token};
+use crate::{
+    ast::{expr::*, stmt::*},
+    interpreter::Interpreter,
+    token::Token,
+};
 
 pub struct Resolver {
     scopes: Vec<HashMap<String, bool>>,
-    pub interpreter: Interpreter
+    pub interpreter: Interpreter,
 }
 
 impl Resolver {
     pub fn new(interpreter: Interpreter) -> Self {
         Resolver {
             scopes: Vec::new(),
-            interpreter
+            interpreter,
         }
     }
 
@@ -24,20 +28,24 @@ impl Resolver {
     }
 
     fn declare(&mut self, name: &Token) {
-        if self.scopes.is_empty() { return };
+        if self.scopes.is_empty() {
+            return;
+        };
         let scope = self.scopes.last_mut();
         match scope {
             Some(s) => s.insert(name.lexme.clone(), false),
-            None => todo!("error")
+            None => todo!("error"),
         };
     }
 
     fn define(&mut self, name: &Token) {
-        if self.scopes.is_empty() { return };
+        if self.scopes.is_empty() {
+            return;
+        };
         let scope = self.scopes.last_mut();
         match scope {
             Some(s) => s.insert(name.lexme.clone(), true),
-            None => todo!("error")
+            None => todo!("error"),
         };
     }
 
@@ -63,7 +71,6 @@ impl Resolver {
         self.resolve_expr(&stmt.initializer);
         self.define(&stmt.name);
     }
-
 
     fn resolve_fun_stmt(&mut self, stmt: &FnStmt) {
         self.declare(&stmt.name);
@@ -105,8 +112,8 @@ impl Resolver {
     fn resolve_for_stmt(&mut self, stmt: &ForStmt) {
         if let Some(i) = &stmt.initializer {
             match i {
-               ForStmtInitializer::VarDecl(v) => self.resolve_var_stmt(&v),
-               ForStmtInitializer::ExprStmt(v) => self.resolve_expr_stmt(&v),
+                ForStmtInitializer::VarDecl(v) => self.resolve_var_stmt(&v),
+                ForStmtInitializer::ExprStmt(v) => self.resolve_expr_stmt(&v),
             }
         }
         if let Some(c) = &stmt.condition {
@@ -116,7 +123,11 @@ impl Resolver {
     }
 
     fn resolve_variable_expr(&mut self, expr: &Variable) {
-        let is_init = self.scopes.last().map(|s| s.get(&expr.name.lexme).unwrap_or(&false)).unwrap_or(&false);
+        let is_init = self
+            .scopes
+            .last()
+            .map(|s| s.get(&expr.name.lexme).unwrap_or(&false))
+            .unwrap_or(&false);
         if !self.scopes.is_empty() && !is_init {
             todo!("error");
         }
@@ -173,7 +184,7 @@ impl Resolver {
             Stmt::IfStmt(i) => self.resolve_if_stmt(i),
             Stmt::ForStmt(f) => self.resolve_for_stmt(f),
             Stmt::Expresssion(e) => self.resolve_expr_stmt(e),
-            _ => ()
+            _ => (),
         }
     }
 
