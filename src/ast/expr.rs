@@ -1,4 +1,6 @@
-use crate::token::{LiteralValue, Token, TokenType};
+use std::hash::{Hash, Hasher};
+
+use crate::token::*;
 
 macro_rules! parenthize_expr {
     ($name:expr, $($exprs:expr),*) => {
@@ -26,6 +28,12 @@ pub enum Expr {
     Assign(Assign),
     Logical(Logical),
     Call(Call),
+}
+
+impl Hash for Expr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.to_string().hash(state);
+    }
 }
 
 #[derive(Clone)]
@@ -56,10 +64,22 @@ pub struct Variable {
     pub name: Token,
 }
 
+impl Variable {
+    pub fn to_string(&self) -> String {
+        self.name.lexme.to_string()
+    }
+}
+
 #[derive(Clone)]
 pub struct Assign {
     pub name: Token,
     pub value: Box<Expr>,
+}
+
+impl Assign {
+    pub fn to_string(&self) -> String {
+        parenthize_expr!(&self.name.lexme, self.value)
+    }
 }
 
 #[derive(Clone)]
@@ -83,8 +103,8 @@ impl Expr {
             Expr::Binary(b) => parenthize_expr!(&b.operator.lexme, b.left, b.right),
             Expr::Unary(u) => parenthize_expr!(&u.operator.lexme, u.right),
             Expr::Grouping(g) => parenthize_expr!("group", g.expression),
-            Expr::Variable(v) => v.name.lexme.clone(),
-            Expr::Assign(a) => parenthize_expr!(&a.name.lexme, a.value),
+            Expr::Variable(v) => v.to_string(),
+            Expr::Assign(a) => a.to_string(),
             Expr::Logical(l) => parenthize_expr!(&l.operator.lexme, l.left, l.right),
             Expr::Call(c) => parenthize_expr!("fun", c.callee),
         }

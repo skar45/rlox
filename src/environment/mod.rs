@@ -8,16 +8,11 @@ pub struct Environment {
     scope: NonNullScope,
 }
 
-enum ScopeContext {
-    Loop,
-    Function,
-}
 
 pub struct Scope {
     var_dcls: HashMap<String, LiteralValue>,
     fn_dcls: HashMap<String, FnStmt>,
     pub enclosing: Option<NonNullScope>,
-    context: Option<ScopeContext>,
 }
 
 impl Environment {
@@ -27,7 +22,6 @@ impl Environment {
                 var_dcls: HashMap::new(),
                 fn_dcls: HashMap::new(),
                 enclosing: None,
-                context: None,
             })))
         };
         Environment { scope }
@@ -38,6 +32,33 @@ impl Environment {
         unsafe {
             let mut_env = env.as_mut();
             mut_env.enclosing = Some(enclosing.scope.clone());
+        }
+    }
+
+    pub fn get_at<'a>(&mut self, distance: usize, name: String) -> Result<Option<&'a LiteralValue>, ()> {
+        unsafe {
+            let mut env = self.scope.as_mut();
+            for _ in 0..distance {
+                match env.enclosing {
+                    Some(mut e) => env = e.as_mut(),
+                    None => return Err(())
+                }
+            }
+            Ok(env.var_dcls.get(&name))
+        }
+    }
+
+    pub fn assign_at<'a>(&mut self, distance: usize, name: String, value: LiteralValue) -> Result<(), ()> {
+        unsafe {
+            let mut env = self.scope.as_mut();
+            for _ in 0..distance {
+                match env.enclosing {
+                    Some(mut e) => env = e.as_mut(),
+                    None => return Err(())
+                }
+            }
+            env.var_dcls.insert(name, value);
+            Ok(())
         }
     }
 

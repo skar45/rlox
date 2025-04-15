@@ -2,6 +2,7 @@ mod ast;
 mod environment;
 mod errors;
 mod interpreter;
+mod resolver;
 mod lexer;
 mod parser;
 mod token;
@@ -17,6 +18,7 @@ use errors::ReportError;
 use interpreter::Interpreter;
 use lexer::scanner::Scanner;
 use parser::Parser;
+use resolver::Resolver;
 
 pub struct Rlox {
     had_error: bool,
@@ -44,9 +46,13 @@ impl Rlox {
         if self.had_error {
             process::exit(0x41)
         };
-        // Interpret
+        // Resolve and Bind
         let env = Environment::new();
         let mut interpreter = Interpreter::new(env);
+        let mut resolver = Resolver::new(interpreter);
+        resolver.resolve(&parsed_stmts);
+        interpreter = resolver.interpreter;
+        // Interpret
         if let Err(error) = interpreter.interpret(parsed_stmts) {
             self.report_error(&error, line_text[error.get_line()]);
         };

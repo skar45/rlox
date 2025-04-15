@@ -1,4 +1,4 @@
-use std::mem;
+use std::{collections::HashMap, mem};
 
 use crate::{
     ast::{expr::*, stmt::*},
@@ -35,11 +35,12 @@ type EvalStmtResult = Result<(), RuntimeState>;
 
 pub struct Interpreter {
     current_env: Environment,
+    locals: HashMap<String, usize>
 }
 
 impl Interpreter {
     pub fn new(env: Environment) -> Self {
-        Interpreter { current_env: env }
+        Interpreter { current_env: env, locals: HashMap::new() }
     }
 
     fn value_error(&self, message: &str, token: &Token) -> RuntimeState {
@@ -139,11 +140,31 @@ impl Interpreter {
         })
     }
 
-    fn eval_variable(&mut self, expr: &Variable) -> EvalExprResult {
-        match self.current_env.get_var(&expr.name.lexme) {
-            Some(v) => Ok(v.clone()),
-            None => Ok(LiteralValue::Nil),
+    fn look_up_variable(&mut self, name: &Token, expr: &Variable) -> EvalExprResult {
+        match self.locals.get(&expr.name.lexme) {
+            Some(d) => {
+                let res = self.current_env.get_at(*d, name.lexme.clone());
+                match res {
+                    Ok(value) => {
+                        match value {
+                            Some(v) => Ok(v.clone()),
+                            None => Ok(LiteralValue::Nil)
+                        }
+                    },
+                    Err(_) => Ok(LiteralValue::Nil)
+                }
+            },
+            None => {
+                match self.current_env.get_var(&name.lexme) {
+                    Some(v) => Ok(v.clone()),
+                    None => Ok(LiteralValue::Nil)
+                }
+            }
         }
+    }
+
+    fn eval_variable(&mut self, expr: &Variable) -> EvalExprResult {
+        self.look_up_variable(&expr.name, expr)
     }
 
     fn eval_assign(&mut self, expr: &Assign) -> EvalExprResult {
@@ -156,11 +177,25 @@ impl Interpreter {
             ));
         }
         let value = self.evaluate(&expr.value)?;
-        if let Err(_) = self.current_env.assign_var(var_name.clone(), value) {
-            return Err(self.value_error(
-                &format!("cannot assign value to {} in this scope", var_name),
-                &expr.name,
-            ));
+
+        let distance = self.locals.get(&expr.to_string());
+        match distance {
+            Some(d) => {
+                if let Err(_) = self.current_env.assign_at(*d, var_name.clone(), value) { 
+                    return Err(self.value_error(
+                        &format!("cannot assign value to {} in this scope", var_name),
+                        &expr.name,
+                    ));
+                }
+            },
+            None => {
+                if let Err(_) = self.current_env.assign_var(var_name.clone(), value) {
+                    return Err(self.value_error(
+                        &format!("cannot assign value to {} in this scope", var_name),
+                        &expr.name,
+                    ));
+                }
+            }
         }
         Ok(LiteralValue::Nil)
     }
@@ -368,6 +403,10 @@ impl Interpreter {
             Stmt::ContStmt(f) => self.execute_cont_stmt(f),
             Stmt::ReturnStmt(r) => self.execute_return_stmt(r),
         }
+    }
+
+    pub fn resolve(&mut self, expr: &Expr, depth: usize) {
+        self.locals.insert(expr.to_string(), depth);
     }
 
     pub fn interpret(&mut self, statements: Vec<Stmt>) -> Result<(), RuntimeError> {
