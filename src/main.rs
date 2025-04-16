@@ -50,7 +50,9 @@ impl Rlox {
         let env = Environment::new();
         let mut interpreter = Interpreter::new(env);
         let mut resolver = Resolver::new(interpreter);
-        resolver.resolve(&parsed_stmts);
+        if let Err(e) = resolver.resolve(&parsed_stmts) {
+            self.report_error(&e, line_text[e.get_line()]);
+        };
         interpreter = resolver.interpreter;
         // Interpret
         if let Err(error) = interpreter.interpret(parsed_stmts) {

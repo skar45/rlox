@@ -406,6 +406,9 @@ impl Interpreter {
 
     pub fn resolve(&mut self, expr: &Expr, depth: usize) {
         self.locals.insert(expr.to_string(), depth);
+        for (k, v) in self.locals.iter() {
+            println!("k {}, v {}", k, v);
+        }
     }
 
     pub fn interpret(&mut self, statements: Vec<Stmt>) -> Result<(), RuntimeError> {

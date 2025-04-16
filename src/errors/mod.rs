@@ -1,5 +1,6 @@
 pub mod interpreter_errors;
 pub mod parser_errors;
+pub mod resolver_errors;
 pub mod scanner_errors;
 
 pub trait ReportError {
