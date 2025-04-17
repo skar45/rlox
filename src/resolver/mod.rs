@@ -7,6 +7,20 @@ use crate::{
     token::Token,
 };
 
+enum ResolveValue<'a> {
+    Assign(&'a Assign),
+    Var(&'a Variable)
+}
+
+impl ResolveValue<'_> {
+    fn get_id(&self) -> usize {
+        match &self {
+            Self::Var(v) => v.id,
+            Self::Assign(a) => a.id
+        }
+    }
+}
+
 pub struct Resolver {
     scopes: Vec<HashMap<String, bool>>,
     pub interpreter: Interpreter,
@@ -57,10 +71,10 @@ impl Resolver {
         };
     }
 
-    fn resolve_local(&mut self, expr: &Expr, name: &Token) {
+    fn resolve_local(&mut self, value: ResolveValue, name: &Token) {
         for (i, scope) in self.scopes.iter().enumerate().rev() {
             if scope.contains_key(&name.lexme) {
-                self.interpreter.resolve(expr, self.scopes.len() - i - 1);
+                self.interpreter.resolve(value.get_id(), self.scopes.len() - i - 1);
                 return;
             }
         }
@@ -149,13 +163,13 @@ impl Resolver {
                 "can't read local variables in its own initializer",
             ));
         }
-        self.resolve_local(&Expr::Variable(expr.clone()), &expr.name);
+        self.resolve_local(ResolveValue::Var(expr), &expr.name);
         Ok(())
     }
 
     fn resolve_assign_expr(&mut self, expr: &Assign) -> ResolveResult {
         self.resolve_expr(expr.value.as_ref())?;
-        self.resolve_local(&Expr::Assign(expr.clone()), &expr.name);
+        self.resolve_local(ResolveValue::Assign(expr), &expr.name);
         Ok(())
     }
 

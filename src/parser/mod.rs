@@ -112,7 +112,7 @@ impl Parser {
                     _ => Err(self.missing_paren()),
                 }
             }
-            TokenType::Identifier => Ok(Expr::variable(self.previous().clone())),
+            TokenType::Identifier => Ok(Expr::variable(self.previous().clone(), self.current)),
             _ => Err(self.expr_error(format!("Invalid token {}", self.previous().lexme).as_str())),
         }
     }
@@ -260,7 +260,7 @@ impl Parser {
             TokenType::Equal => {
                 self.advance();
                 match expr {
-                    Expr::Variable(v) => Ok(Expr::assign(v.name.clone(), self.assignment()?)),
+                    Expr::Variable(v) => Ok(Expr::assign(v.name.clone(), self.assignment()?, self.current)),
                     _ => Err(self.expr_error("invalid var assignment")),
                 }
             }

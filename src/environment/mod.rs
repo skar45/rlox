@@ -41,7 +41,6 @@ impl Environment {
     ) -> Result<Option<&'a LiteralValue>, ()> {
         unsafe {
             let mut env = self.scope.as_mut();
-            println!("name {} distance {}", name, distance);
             for _ in 0..distance {
                 match env.enclosing {
                     Some(mut e) => env = e.as_mut(),

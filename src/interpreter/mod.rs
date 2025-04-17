@@ -35,7 +35,7 @@ type EvalStmtResult = Result<(), RuntimeState>;
 
 pub struct Interpreter {
     current_env: Environment,
-    locals: HashMap<String, usize>,
+    locals: HashMap<usize, usize>,
 }
 
 impl Interpreter {
@@ -144,7 +144,7 @@ impl Interpreter {
     }
 
     fn look_up_variable(&mut self, name: &Token, expr: &Variable) -> EvalExprResult {
-        match self.locals.get(&expr.name.lexme) {
+        match self.locals.get(&expr.id) {
             Some(d) => {
                 let res = self.current_env.get_at(*d, name.lexme.clone());
                 match res {
@@ -177,7 +177,7 @@ impl Interpreter {
         }
         let value = self.evaluate(&expr.value)?;
 
-        let distance = self.locals.get(&expr.to_string());
+        let distance = self.locals.get(&expr.id);
         match distance {
             Some(d) => {
                 if let Err(_) = self.current_env.assign_at(*d, var_name.clone(), value) {
@@ -404,11 +404,8 @@ impl Interpreter {
         }
     }
 
-    pub fn resolve(&mut self, expr: &Expr, depth: usize) {
-        self.locals.insert(expr.to_string(), depth);
-        for (k, v) in self.locals.iter() {
-            println!("k {}, v {}", k, v);
-        }
+    pub fn resolve(&mut self, id: usize, depth: usize) {
+        self.locals.insert(id, depth);
     }
 
     pub fn interpret(&mut self, statements: Vec<Stmt>) -> Result<(), RuntimeError> {

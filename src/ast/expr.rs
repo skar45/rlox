@@ -1,6 +1,8 @@
-use std::hash::{Hash, Hasher};
+use std::usize;
 
 use crate::token::*;
+
+type ExprId = usize;
 
 macro_rules! parenthize_expr {
     ($name:expr, $($exprs:expr),*) => {
@@ -30,12 +32,6 @@ pub enum Expr {
     Call(Call),
 }
 
-impl Hash for Expr {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.to_string().hash(state);
-    }
-}
-
 #[derive(Clone)]
 pub struct Literal {
     pub value: LiteralValue,
@@ -62,6 +58,7 @@ pub struct Unary {
 #[derive(Clone)]
 pub struct Variable {
     pub name: Token,
+    pub id: ExprId
 }
 
 impl Variable {
@@ -74,6 +71,7 @@ impl Variable {
 pub struct Assign {
     pub name: Token,
     pub value: Box<Expr>,
+    pub id: ExprId
 }
 
 impl Assign {
@@ -137,13 +135,14 @@ impl Expr {
         })
     }
 
-    pub fn variable(name: Token) -> Self {
-        Expr::Variable(Variable { name })
+    pub fn variable(name: Token, id: usize) -> Self {
+        Expr::Variable(Variable { name, id })
     }
 
-    pub fn assign(name: Token, value: Expr) -> Self {
+    pub fn assign(name: Token, value: Expr, id: usize) -> Self {
         Expr::Assign(Assign {
             name,
+            id,
             value: Box::new(value),
         })
     }
