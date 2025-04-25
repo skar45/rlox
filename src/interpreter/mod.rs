@@ -2,15 +2,16 @@ use std::{collections::HashMap, mem};
 
 use crate::{
     ast::{expr::*, stmt::*},
+    class::{FieldType, RloxClass, RloxInstance},
     environment::Environment,
     errors::interpreter_errors::RuntimeError,
-    token::{LiteralValue, Token, TokenType},
+    token::{RloxValue, Token, TokenType},
 };
 
 enum ControlFlow {
     Continue,
     Break,
-    Return(LiteralValue),
+    Return(RloxValue),
 }
 
 enum RuntimeState {
@@ -30,7 +31,7 @@ impl From<ControlFlow> for RuntimeState {
     }
 }
 
-type EvalExprResult = Result<LiteralValue, RuntimeState>;
+type EvalExprResult = Result<RloxValue, RuntimeState>;
 type EvalStmtResult = Result<(), RuntimeState>;
 
 pub struct Interpreter {
@@ -39,10 +40,10 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
-    pub fn new(env: Environment) -> Self {
+    pub fn new(env: Environment, locals: HashMap<usize, usize>) -> Self {
         Interpreter {
             current_env: env,
-            locals: HashMap::new(),
+            locals,
         }
     }
 
@@ -56,22 +57,22 @@ impl Interpreter {
         RuntimeState::RtErr(e)
     }
 
-    fn is_truthy(&self, value: &LiteralValue) -> bool {
+    fn is_truthy(&self, value: &RloxValue) -> bool {
         match value {
-            LiteralValue::Bool(b) => *b,
-            LiteralValue::Nil => false,
+            RloxValue::Bool(b) => *b,
+            RloxValue::Nil => false,
             _ => true,
         }
     }
 
-    fn is_equal(&self, v1: &LiteralValue, v2: &LiteralValue) -> bool {
+    fn is_equal(&self, v1: &RloxValue, v2: &RloxValue) -> bool {
         match (v1, v2) {
-            (LiteralValue::Nil, LiteralValue::Nil) => true,
-            (LiteralValue::Nil, _) => false,
-            (_, LiteralValue::Nil) => false,
-            (LiteralValue::Num(n1), LiteralValue::Num(n2)) => n1 == n2,
-            (LiteralValue::Str(s1), LiteralValue::Str(s2)) => s1 == s2,
-            (LiteralValue::Bool(b1), LiteralValue::Bool(b2)) => b1 == b2,
+            (RloxValue::Nil, RloxValue::Nil) => true,
+            (RloxValue::Nil, _) => false,
+            (_, RloxValue::Nil) => false,
+            (RloxValue::Num(n1), RloxValue::Num(n2)) => n1 == n2,
+            (RloxValue::Str(s1), RloxValue::Str(s2)) => s1 == s2,
+            (RloxValue::Bool(b1), RloxValue::Bool(b2)) => b1 == b2,
             _ => false,
         }
     }
@@ -89,11 +90,11 @@ impl Interpreter {
 
         Ok(match expr.operator.r#type {
             TokenType::Minus => match right {
-                LiteralValue::Num(n) => LiteralValue::Num(-n),
-                _ => LiteralValue::Nil,
+                RloxValue::Num(n) => RloxValue::Num(-n),
+                _ => RloxValue::Nil,
             },
-            TokenType::Bang => LiteralValue::Bool(self.is_truthy(&right)),
-            _ => LiteralValue::Nil,
+            TokenType::Bang => RloxValue::Bool(self.is_truthy(&right)),
+            _ => RloxValue::Nil,
         })
     }
 
@@ -103,43 +104,41 @@ impl Interpreter {
 
         Ok(match expr.operator.r#type {
             TokenType::Minus => match (left, right) {
-                (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Num(n1 - n2),
-                _ => LiteralValue::Nil,
+                (RloxValue::Num(n1), RloxValue::Num(n2)) => RloxValue::Num(n1 - n2),
+                _ => RloxValue::Nil,
             },
             TokenType::Slash => match (left, right) {
-                (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Num(n1 / n2),
-                _ => LiteralValue::Nil,
+                (RloxValue::Num(n1), RloxValue::Num(n2)) => RloxValue::Num(n1 / n2),
+                _ => RloxValue::Nil,
             },
             TokenType::Star => match (left, right) {
-                (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Num(n1 * n2),
-                _ => LiteralValue::Nil,
+                (RloxValue::Num(n1), RloxValue::Num(n2)) => RloxValue::Num(n1 * n2),
+                _ => RloxValue::Nil,
             },
             TokenType::Plus => match (left, right) {
-                (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Num(n1 + n2),
-                (LiteralValue::Str(s1), LiteralValue::Str(s2)) => {
-                    LiteralValue::Str(format!("{}{}", s1, s2))
-                }
-                _ => LiteralValue::Nil,
+                (RloxValue::Num(n1), RloxValue::Num(n2)) => RloxValue::Num(n1 + n2),
+                (RloxValue::Str(s1), RloxValue::Str(s2)) => RloxValue::Str(format!("{}{}", s1, s2)),
+                _ => RloxValue::Nil,
             },
             TokenType::Greater => match (left, right) {
-                (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Bool(n1 > n2),
-                _ => LiteralValue::Nil,
+                (RloxValue::Num(n1), RloxValue::Num(n2)) => RloxValue::Bool(n1 > n2),
+                _ => RloxValue::Nil,
             },
             TokenType::GreaterEqual => match (left, right) {
-                (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Bool(n1 >= n2),
-                _ => LiteralValue::Nil,
+                (RloxValue::Num(n1), RloxValue::Num(n2)) => RloxValue::Bool(n1 >= n2),
+                _ => RloxValue::Nil,
             },
             TokenType::Less => match (left, right) {
-                (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Bool(n1 < n2),
-                _ => LiteralValue::Nil,
+                (RloxValue::Num(n1), RloxValue::Num(n2)) => RloxValue::Bool(n1 < n2),
+                _ => RloxValue::Nil,
             },
             TokenType::LessEqual => match (left, right) {
-                (LiteralValue::Num(n1), LiteralValue::Num(n2)) => LiteralValue::Bool(n1 <= n2),
-                _ => LiteralValue::Nil,
+                (RloxValue::Num(n1), RloxValue::Num(n2)) => RloxValue::Bool(n1 <= n2),
+                _ => RloxValue::Nil,
             },
-            TokenType::BangEqual => LiteralValue::Bool(!self.is_equal(&left, &right)),
-            TokenType::EqualEqual => LiteralValue::Bool(self.is_equal(&left, &right)),
-            _ => LiteralValue::Nil,
+            TokenType::BangEqual => RloxValue::Bool(!self.is_equal(&left, &right)),
+            TokenType::EqualEqual => RloxValue::Bool(self.is_equal(&left, &right)),
+            _ => RloxValue::Nil,
         })
     }
 
@@ -150,14 +149,14 @@ impl Interpreter {
                 match res {
                     Ok(value) => match value {
                         Some(v) => Ok(v.clone()),
-                        None => Ok(LiteralValue::Nil),
+                        None => Ok(RloxValue::Nil),
                     },
-                    Err(_) => Ok(LiteralValue::Nil),
+                    Err(_) => Ok(RloxValue::Nil),
                 }
             }
             None => match self.current_env.get_var(&name.lexme) {
                 Some(v) => Ok(v.clone()),
-                None => Ok(LiteralValue::Nil),
+                None => Ok(RloxValue::Nil),
             },
         }
     }
@@ -196,7 +195,7 @@ impl Interpreter {
                 }
             }
         }
-        Ok(LiteralValue::Nil)
+        Ok(RloxValue::Nil)
     }
 
     fn eval_logical(&mut self, expr: &Logical) -> EvalExprResult {
@@ -214,7 +213,7 @@ impl Interpreter {
                 if self.is_truthy(&eval_left) {
                     self.evaluate(&expr.right)
                 } else {
-                    Ok(LiteralValue::Bool(false))
+                    Ok(RloxValue::Bool(false))
                 }
             }
             _ => Err(self.expression_error(
@@ -224,22 +223,18 @@ impl Interpreter {
         }
     }
 
-    fn eval_call(&mut self, expr: &Call) -> EvalExprResult {
-        let mut args = Vec::new();
-        let mut ret_val = LiteralValue::Nil;
-        for arg in &expr.args {
-            args.push(self.evaluate(&arg)?);
-        }
-        let rlox_fn = self.current_env.get_fn(&expr.callee);
-        if let Some(fun) = rlox_fn {
+    fn call(&mut self, args: Vec<RloxValue>, fun_stmt: &FnStmt) -> EvalExprResult {
+            let mut ret_val = RloxValue::Nil;
             let mut env = Environment::new();
             env.add_enclosing(&self.current_env);
             let prev = mem::replace(&mut self.current_env, env);
-            for (i, param) in fun.params.iter().enumerate() {
+
+            for (i, param) in fun_stmt.params.iter().enumerate() {
                 self.current_env
                     .define_var(param.lexme.clone(), args[i].clone());
             }
-            for stmt in &fun.body {
+
+            for stmt in &fun_stmt.body {
                 if let Err(e) = self.execute(stmt) {
                     match e {
                         RuntimeState::Cf(c) => match c {
@@ -254,13 +249,61 @@ impl Interpreter {
                 };
             }
             let _ = mem::replace(&mut self.current_env, prev);
-        } else {
-            return Err(self.value_error(
-                &format!("cannot find function {} in this scope", &expr.callee),
-                &expr.paren,
-            ));
+            return Ok(ret_val);
+    }
+
+    fn eval_call(&mut self, expr: &Call) -> EvalExprResult {
+        let mut args = Vec::new();
+        for arg in &expr.args {
+            args.push(self.evaluate(&arg)?);
         }
-        Ok(ret_val)
+
+        if let Some(fun) = self.current_env.get_fn(&expr.callee) {
+            return self.call(args, fun);
+        }
+
+        if let Some(class)  = self.current_env.get_class(&expr.callee) {
+            let instance = RloxInstance::new(class.clone(), args);
+            return Ok(RloxValue::Instance(instance));
+        }
+
+        Err(self.value_error(
+            &format!("cannot find function {} in this scope", &expr.callee),
+            &expr.paren,
+        ))
+    }
+
+    fn bind(&mut self, instance: RloxInstance) -> RloxValue {
+        RloxValue::Nil
+    }
+
+    fn eval_get(&mut self, expr: &Get) -> EvalExprResult {
+        let object = self.evaluate(&expr.object)?;
+        match object {
+            RloxValue::Instance(i) => match i.get(&expr.name.lexme) {
+                Some(v) => match v {
+                    FieldType::Field(f) => Ok(f.clone()),
+                    FieldType::Method(m) => Ok(self.bind(i)),
+                },
+                None => return Err(self.value_error("undefined property", &expr.name))
+            },
+            _ => return Err(self.value_error("only instances have properties", &expr.name))
+        }
+    }
+
+    fn eval_set(&mut self, expr: &Set) -> EvalExprResult {
+        let object = self.evaluate(&expr.object)?;
+        match object {
+            RloxValue::Instance(mut i) => {
+                let value = self.evaluate(&expr.value)?;
+                return match i.set(expr.name.lexme.clone(), value) {
+                    Some(v) => Ok(v),
+                    None => Err(self.value_error("only instances have properties", &expr.name))
+                }
+                
+            },
+            _ => return Err(self.value_error("only instances have properties", &expr.name))
+        }
     }
 
     fn evaluate(&mut self, expr: &Expr) -> EvalExprResult {
@@ -273,6 +316,9 @@ impl Interpreter {
             Expr::Assign(a) => self.eval_assign(a),
             Expr::Logical(l) => self.eval_logical(l),
             Expr::Call(c) => self.eval_call(c),
+            Expr::Get(g) => self.eval_get(g),
+            Expr::Set(s) => self.eval_set(s),
+            Expr::This(t) => todo!("this")
         }
     }
 
@@ -374,9 +420,8 @@ impl Interpreter {
     fn execute_return_stmt(&mut self, stmt: &ReturnStmt) -> EvalStmtResult {
         let val = match &stmt.value {
             Some(v) => self.evaluate(v)?,
-            None => LiteralValue::Nil,
+            None => RloxValue::Nil,
         };
-
         Err(RuntimeState::Cf(ControlFlow::Return(val)))
     }
 
@@ -386,6 +431,18 @@ impl Interpreter {
 
     fn execute_cont_stmt(&mut self, _stmt: &ContStmt) -> EvalStmtResult {
         Err(RuntimeState::Cf(ControlFlow::Continue))
+    }
+
+    fn execute_class_stmt(&mut self, stmt: &Class) -> EvalStmtResult {
+        let name = &stmt.name.lexme;
+        let mut methods = HashMap::new();
+        let init_params = stmt.params.iter().map(|p| p.lexme.to_string()).collect();
+        for method in &stmt.methods {
+            methods.insert(method.name.lexme.clone(), method.clone());
+        }
+        let rlox_class = RloxClass::new(name.clone(), methods, init_params);
+        self.current_env.define_class(name.clone(), rlox_class);
+        Ok(())
     }
 
     fn execute(&mut self, stmt: &Stmt) -> EvalStmtResult {
@@ -401,11 +458,8 @@ impl Interpreter {
             Stmt::BreakStmt(f) => self.execute_break_stmt(f),
             Stmt::ContStmt(f) => self.execute_cont_stmt(f),
             Stmt::ReturnStmt(r) => self.execute_return_stmt(r),
+            Stmt::Class(c) => self.execute_class_stmt(c),
         }
-    }
-
-    pub fn resolve(&mut self, id: usize, depth: usize) {
-        self.locals.insert(id, depth);
     }
 
     pub fn interpret(&mut self, statements: Vec<Stmt>) -> Result<(), RuntimeError> {

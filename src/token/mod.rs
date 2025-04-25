@@ -1,3 +1,5 @@
+use crate::class::RloxInstance;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
     LeftParen,
@@ -70,29 +72,31 @@ impl TokenType {
 }
 
 #[derive(Debug, Clone)]
-pub enum LiteralValue {
+pub enum RloxValue {
     Str(String),
     Num(f64),
     Bool(bool),
+    Instance(RloxInstance),
     Nil,
 }
 
-impl std::fmt::Display for LiteralValue {
+impl std::fmt::Display for RloxValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LiteralValue::Str(v) => write!(f, "{}", v),
-            LiteralValue::Num(v) => write!(f, "{}", v),
-            LiteralValue::Bool(v) => write!(f, "{}", v),
-            LiteralValue::Nil => write!(f, "Nil"),
+            RloxValue::Str(v) => write!(f, "{}", v),
+            RloxValue::Num(v) => write!(f, "{}", v),
+            RloxValue::Bool(v) => write!(f, "{}", v),
+            RloxValue::Nil => write!(f, "Nil"),
+            RloxValue::Instance(i) => write!(f, "{}", i)
         }
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Token {
     pub r#type: TokenType,
     pub lexme: String,
-    pub literal: Option<LiteralValue>,
+    pub literal: Option<RloxValue>,
     pub line: usize,
     pub column: usize,
 }

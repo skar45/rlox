@@ -1,4 +1,5 @@
 mod ast;
+mod class;
 mod environment;
 mod errors;
 mod interpreter;
@@ -6,6 +7,7 @@ mod lexer;
 mod parser;
 mod resolver;
 mod token;
+mod callable;
 
 use std::{
     env, fs,
@@ -33,30 +35,30 @@ impl Rlox {
         let line_text = source.split("\n").collect::<Vec<&str>>();
         // Lex
         let mut scanner = Scanner::new(source.clone());
-        if let Err(error) = scanner.scan_tokens() {
-            self.report_error(&error, line_text[error.get_line()]);
+        if let Err(e) = scanner.scan_tokens() {
+            self.report_error(&e, line_text[e.get_line()]);
             process::exit(0x41);
         }
         // Parse
         let mut parser = Parser::new(scanner.tokens);
         let (parsed_stmts, parser_errors) = parser.parse();
-        for error in parser_errors {
-            self.report_error(&error, line_text[error.get_line()]);
+        for e in parser_errors {
+            self.report_error(&e, line_text[e.get_line()]);
         }
         if self.had_error {
             process::exit(0x41)
         };
-        // Resolve and Bind
-        let env = Environment::new();
-        let mut interpreter = Interpreter::new(env);
-        let mut resolver = Resolver::new(interpreter);
+        // Resolve
+        let mut resolver = Resolver::new();
         if let Err(e) = resolver.resolve(&parsed_stmts) {
             self.report_error(&e, line_text[e.get_line()]);
+            process::exit(0x41)
         };
-        interpreter = resolver.interpreter;
         // Interpret
-        if let Err(error) = interpreter.interpret(parsed_stmts) {
-            self.report_error(&error, line_text[error.get_line()]);
+        let env = Environment::new();
+        let mut interpreter = Interpreter::new(env, resolver.locals);
+        if let Err(e) = interpreter.interpret(parsed_stmts) {
+            self.report_error(&e, line_text[e.get_line()]);
         };
     }
 
@@ -100,7 +102,7 @@ impl Rlox {
         eprintln!("\x1b[37;41m Error \x1b[0m: {}", message);
         println!("{}|", l_pad);
         for i in 1..=text_lines.len() {
-            let line_num = (line - text_lines.len()) + i;
+            let line_num = (line - text_lines.len() + 1) + i;
             let l_pad = if line_num > 9 { "  " } else { "   " };
             println!("{}{}| {}", line_num, l_pad, text_lines[i - 1]);
         }

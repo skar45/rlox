@@ -1,10 +1,10 @@
 use crate::{
     ast::{
         expr::Expr,
-        stmt::{BreakStmt, ContStmt, ForStmtInitializer, Stmt},
+        stmt::{BreakStmt, ContStmt, FnStmt, ForStmtInitializer, Stmt},
     },
     errors::parser_errors::ParserError,
-    token::{LiteralValue, Token, TokenType},
+    token::{RloxValue, Token, TokenType},
 };
 
 type ParseExprResult = Result<Expr, ParserError>;
@@ -98,20 +98,24 @@ impl Parser {
 
     fn primary(&mut self) -> ParseExprResult {
         match self.advance().r#type {
-            TokenType::True => Ok(Expr::literal(LiteralValue::Bool(true))),
-            TokenType::False => Ok(Expr::literal(LiteralValue::Bool(false))),
-            TokenType::Nil => Ok(Expr::literal(LiteralValue::Nil)),
+            TokenType::True => Ok(Expr::literal(RloxValue::Bool(true))),
+            TokenType::False => Ok(Expr::literal(RloxValue::Bool(false))),
+            TokenType::Nil => Ok(Expr::literal(RloxValue::Nil)),
             TokenType::Number | TokenType::String => match &self.previous().literal {
                 Some(v) => Ok(Expr::literal(v.clone())),
                 None => Err(self.missing_literal()),
             },
             TokenType::LeftParen => {
                 let expr = self.expression()?;
-                match self.advance().r#type {
-                    TokenType::RightParen => Ok(Expr::grouping(expr)),
+                match self.peek().r#type {
+                    TokenType::RightParen => {
+                        self.advance();
+                        Ok(Expr::grouping(expr))
+                    },
                     _ => Err(self.missing_paren()),
                 }
             }
+            TokenType::This => Ok(Expr::this(self.previous().clone())),
             TokenType::Identifier => Ok(Expr::variable(self.previous().clone(), self.current)),
             _ => Err(self.expr_error(format!("Invalid token {}", self.previous().lexme).as_str())),
         }
@@ -120,31 +124,40 @@ impl Parser {
     fn call(&mut self) -> ParseExprResult {
         let mut expr = self.primary()?;
         loop {
-            if self.peek().r#type != TokenType::LeftParen {
-                break;
-            };
-            self.advance();
-            let mut args = Vec::new();
-            args.reserve(255);
-            loop {
-                if self.peek().r#type == TokenType::RightParen {
-                    break;
-                }
-                if args.len() > 255 {
-                    return Err(self.stmt_error("Can't have more than 255 arguments"));
-                }
-                args.push(self.expression()?);
-                if self.peek().r#type == TokenType::Comma {
+            match self.peek().r#type {
+                TokenType::Dot => {
                     self.advance();
-                } else {
-                    break;
+                    let name = self.advance();
+                    expr = Expr::get(name.clone(), expr);
                 }
+                TokenType::LeftParen => {
+                    let callee = self.previous().lexme.clone();
+                    self.advance();
+                    let mut args = Vec::new();
+                    args.reserve(255);
+                    loop {
+                        if self.peek().r#type == TokenType::RightParen {
+                            break;
+                        }
+                        if args.len() > 255 {
+                            return Err(self.stmt_error("Can't have more than 255 arguments"));
+                        }
+                        args.push(self.expression()?);
+                        if self.peek().r#type == TokenType::Comma {
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+                    if self.peek().r#type != TokenType::RightParen {
+                        return Err(self.stmt_error("missing \")\" for function call"));
+                    }
+                    let paren = self.advance().clone();
+                    expr = Expr::call(callee, paren, args);
+
+                }
+                _ => break
             }
-            if self.peek().r#type != TokenType::RightParen {
-                return Err(self.stmt_error("missing \")\" for function call"));
-            }
-            let paren = self.advance().clone();
-            expr = Expr::call(expr.to_string(), paren, args);
         }
         Ok(expr)
     }
@@ -200,7 +213,6 @@ impl Parser {
                 | TokenType::LessEqual => {
                     let operator = self.advance().clone();
                     let right = self.term()?;
-                    self.advance();
                     expr = Expr::binary(expr, operator, right);
                 }
                 _ => break,
@@ -260,7 +272,12 @@ impl Parser {
             TokenType::Equal => {
                 self.advance();
                 match expr {
-                    Expr::Variable(v) => Ok(Expr::assign(v.name.clone(), self.assignment()?, self.current)),
+                    Expr::Variable(v) => Ok(Expr::assign(
+                        v.name.clone(),
+                        self.assignment()?,
+                        self.current,
+                    )),
+                    Expr::Get(g) => Ok(Expr::set(g.name.clone(), *g.object, self.assignment()?)),
                     _ => Err(self.expr_error("invalid var assignment")),
                 }
             }
@@ -313,12 +330,10 @@ impl Parser {
         if self.peek().r#type != TokenType::LeftParen {
             return Err(self.stmt_error("missing \"(\""));
         }
-        self.advance();
         let condition = self.expression()?;
-        if self.peek().r#type != TokenType::RightParen {
+        if self.previous().r#type != TokenType::RightParen {
             return Err(self.stmt_error("missing \")\""));
         }
-        self.advance();
         let then_branch = self.statement()?;
         let else_branch = match self.previous().r#type {
             TokenType::Else => {
@@ -378,7 +393,7 @@ impl Parser {
             _ => Some(self.expression()?),
         };
 
-        if self.previous().r#type != TokenType::Semicolon {
+        if self.advance().r#type != TokenType::Semicolon {
             return Err(self.stmt_error("missing \";\" after loop condition"));
         };
 
@@ -396,7 +411,7 @@ impl Parser {
         Ok(Stmt::for_stmt(body, initializer, condition, afterthought))
     }
 
-    fn fn_statement(&mut self) -> ParseStmtResult {
+    fn create_fn_statment(&mut self) -> Result<FnStmt, ParserError> {
         if self.peek().r#type != TokenType::Identifier {
             return Err(self.stmt_error("expected function name"));
         }
@@ -426,7 +441,11 @@ impl Parser {
         }
         self.advance();
         let body = self.block()?;
-        Ok(Stmt::fn_stmt(name, params, body))
+        Ok(FnStmt { name, params, body })
+    }
+
+    fn fn_statement(&mut self) -> ParseStmtResult {
+        Ok(Stmt::FnStmt(self.create_fn_statment()?))
     }
 
     fn return_statement(&mut self) -> ParseStmtResult {
@@ -456,6 +475,54 @@ impl Parser {
         }
         self.advance();
         Ok(Stmt::ContStmt(ContStmt {}))
+    }
+
+    fn class_statement(&mut self) -> ParseStmtResult {
+        let name = self.advance().clone();
+        let mut args = Vec::new();
+        let mut methods = Vec::new();
+        if name.r#type != TokenType::Identifier {
+            return Err(self.stmt_error("missing class name"));
+        }
+        match self.advance().r#type {
+            TokenType::LeftParen => loop {
+                let token = self.advance();
+                match token.r#type {
+                    TokenType::RightParen => {
+                        if self.advance().r#type == TokenType::Semicolon {
+                            return Ok(Stmt::class_stmt(name, methods, args));
+                        };
+                        break;
+                    }
+                    TokenType::Comma => continue,
+                    TokenType::Identifier => {
+                        if args.len() < 256 {
+                            args.push(token.clone());
+                        } else {
+                            return Err(self.stmt_error("cannot have more than 255 arguments"));
+                        }
+                    }
+                    _ => return Err(self.stmt_error("invalid function param")),
+                }
+            },
+            TokenType::Semicolon => {
+                return Ok(Stmt::class_stmt(name, methods, args));
+            }
+            _ => (),
+        }
+
+        if self.previous().r#type != TokenType::LeftBrace {
+            return Err(self.stmt_error("missing '{' before class body"));
+        }
+
+        loop {
+            match self.advance().r#type {
+                TokenType::Fun => methods.push(self.create_fn_statment()?),
+                TokenType::Var => (),
+                TokenType::RightBrace => return Ok(Stmt::class_stmt(name, methods, args)),
+                _ => (),
+            }
+        }
     }
 
     fn statement(&mut self) -> ParseStmtResult {
@@ -495,6 +562,10 @@ impl Parser {
             TokenType::Continue => {
                 self.advance();
                 Ok(self.continue_statement()?)
+            }
+            TokenType::Class => {
+                self.advance();
+                Ok(self.class_statement()?)
             }
             _ => self.expression_statement(),
         }

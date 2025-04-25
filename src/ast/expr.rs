@@ -20,7 +20,7 @@ macro_rules! parenthize_expr {
     };
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     Literal(Literal),
     Binary(Binary),
@@ -30,68 +30,77 @@ pub enum Expr {
     Assign(Assign),
     Logical(Logical),
     Call(Call),
+    Get(Get),
+    Set(Set),
+    This(This)
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Literal {
-    pub value: LiteralValue,
+    pub value: RloxValue,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Grouping {
     pub expression: Box<Expr>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Binary {
     pub left: Box<Expr>,
     pub operator: Token,
     pub right: Box<Expr>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Unary {
     pub operator: Token,
     pub right: Box<Expr>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Variable {
     pub name: Token,
-    pub id: ExprId
+    pub id: ExprId,
 }
 
-impl Variable {
-    pub fn to_string(&self) -> String {
-        self.name.lexme.to_string()
-    }
-}
-
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Assign {
     pub name: Token,
     pub value: Box<Expr>,
-    pub id: ExprId
+    pub id: ExprId,
 }
 
-impl Assign {
-    pub fn to_string(&self) -> String {
-        parenthize_expr!(&self.name.lexme, self.value)
-    }
-}
-
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Logical {
     pub left: Box<Expr>,
     pub right: Box<Expr>,
     pub operator: Token,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Call {
     pub callee: String,
     pub paren: Token,
     pub args: Vec<Expr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Get {
+    pub object: Box<Expr>,
+    pub name: Token,
+}
+
+#[derive(Debug, Clone)]
+pub struct Set {
+    pub object: Box<Expr>,
+    pub value: Box<Expr>,
+    pub name: Token,
+}
+
+#[derive(Debug, Clone)]
+pub struct This {
+    pub keyword: Token,
 }
 
 impl Expr {
@@ -101,14 +110,17 @@ impl Expr {
             Expr::Binary(b) => parenthize_expr!(&b.operator.lexme, b.left, b.right),
             Expr::Unary(u) => parenthize_expr!(&u.operator.lexme, u.right),
             Expr::Grouping(g) => parenthize_expr!("group", g.expression),
-            Expr::Variable(v) => v.to_string(),
-            Expr::Assign(a) => a.to_string(),
+            Expr::Variable(v) => parenthize_expr!(&v.name.lexme,),
+            Expr::Assign(a) => parenthize_expr!(&a.name.lexme, a.value),
             Expr::Logical(l) => parenthize_expr!(&l.operator.lexme, l.left, l.right),
             Expr::Call(c) => parenthize_expr!("fun", c.callee),
+            Expr::Get(g) => parenthize_expr!(&g.name.lexme, g.object),
+            Expr::Set(s) => parenthize_expr!(&s.name.lexme, s.object, s.value),
+            Expr::This(t) => parenthize_expr!(&t.keyword.lexme,),
         }
     }
 
-    pub fn literal(literal_type: LiteralValue) -> Self {
+    pub fn literal(literal_type: RloxValue) -> Self {
         Expr::Literal(Literal {
             value: literal_type,
         })
@@ -162,11 +174,32 @@ impl Expr {
             args,
         })
     }
+
+    pub fn get(name: Token, object: Expr) -> Self {
+        Expr::Get(Get {
+            name,
+            object: Box::new(object)
+        })
+    }
+
+    pub fn set(name: Token, object: Expr, value: Expr) -> Self {
+        Expr::Set(Set {
+            name,
+            object: Box::new(object),
+            value: Box::new(value)
+        })
+    }
+
+    pub fn this(keyword: Token) -> Self {
+        Expr::This(This {
+            keyword,
+        })
+    }
 }
 
 #[test]
 pub fn liter_expr() {
-    let l = Expr::literal(LiteralValue::Num(2.0));
+    let l = Expr::literal(RloxValue::Num(2.0));
     assert_eq!("2", l.to_string());
 }
 
@@ -186,9 +219,9 @@ pub fn group_expr() {
         lexme: "+".to_string(),
         literal: None,
     };
-    let l1 = Expr::literal(LiteralValue::Num(4.0));
-    let l2 = Expr::literal(LiteralValue::Num(15.0));
-    let l3 = Expr::literal(LiteralValue::Num(9.0));
+    let l1 = Expr::literal(RloxValue::Num(4.0));
+    let l2 = Expr::literal(RloxValue::Num(15.0));
+    let l3 = Expr::literal(RloxValue::Num(9.0));
     let b1 = Expr::binary(l1, multiplication, l2);
     let g = Expr::grouping(b1);
     let b2 = Expr::binary(l3, addition, g);

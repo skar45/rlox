@@ -3,36 +3,45 @@ use std::collections::HashMap;
 use crate::{
     ast::{expr::*, stmt::*},
     errors::resolver_errors::ResolverError,
-    interpreter::Interpreter,
     token::Token,
 };
 
 enum ResolveValue<'a> {
     Assign(&'a Assign),
-    Var(&'a Variable)
+    Var(&'a Variable),
 }
+
 
 impl ResolveValue<'_> {
     fn get_id(&self) -> usize {
         match &self {
             Self::Var(v) => v.id,
-            Self::Assign(a) => a.id
+            Self::Assign(a) => a.id,
         }
     }
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum FunctionType {
+    None,
+    Function,
+    Method
+}
+
 pub struct Resolver {
     scopes: Vec<HashMap<String, bool>>,
-    pub interpreter: Interpreter,
+    current_function: FunctionType,
+    pub locals: HashMap<usize, usize>,
 }
 
 type ResolveResult = Result<(), ResolverError>;
 
 impl Resolver {
-    pub fn new(interpreter: Interpreter) -> Self {
+    pub fn new() -> Self {
         Resolver {
             scopes: Vec::new(),
-            interpreter,
+            locals: HashMap::new(),
+            current_function: FunctionType::None
         }
     }
 
@@ -74,7 +83,8 @@ impl Resolver {
     fn resolve_local(&mut self, value: ResolveValue, name: &Token) {
         for (i, scope) in self.scopes.iter().enumerate().rev() {
             if scope.contains_key(&name.lexme) {
-                self.interpreter.resolve(value.get_id(), self.scopes.len() - i - 1);
+                self.locals
+                    .insert(value.get_id(), self.scopes.len() - i - 1);
                 return;
             }
         }
@@ -96,15 +106,18 @@ impl Resolver {
         Ok(())
     }
 
-    fn resolve_fun_stmt(&mut self, stmt: &FnStmt) -> ResolveResult {
+    fn resolve_fun_stmt(&mut self, stmt: &FnStmt, fn_type: FunctionType) -> ResolveResult {
         self.declare(&stmt.name);
         self.define(&stmt.name);
+        let enclosing_function = self.current_function;
+        self.current_function = fn_type;
         self.begin_scope();
         for param in &stmt.params {
             self.declare(param);
             self.define(param);
         }
         self.end_scope();
+        self.current_function = enclosing_function;
         Ok(())
     }
 
@@ -125,6 +138,12 @@ impl Resolver {
     }
 
     fn resolve_return_stmt(&mut self, stmt: &ReturnStmt) -> ResolveResult {
+        if self.current_function == FunctionType::None {
+            return Err(Resolver::var_error(
+                &stmt._keyword,
+                "can't read local variables in its own initializer",
+            ));
+        }
         if let Some(v) = &stmt.value {
             self.resolve_expr(v)?;
         }
@@ -148,6 +167,20 @@ impl Resolver {
             self.resolve_expr(c)?;
         }
         self.resolve_stmt(stmt.body.as_ref())?;
+        Ok(())
+    }
+
+    fn resolve_class_stmt(&mut self, stmt: &Class) -> ResolveResult {
+        self.declare(&stmt.name);
+        self.define(&stmt.name);
+        self.begin_scope();
+        if let Some(h) = self.scopes.last_mut() {
+            h.insert("this".to_string(), true);
+        }
+        for method in &stmt.methods {
+            self.resolve_fun_stmt(method, FunctionType::Method)?;
+        }
+        self.end_scope();
         Ok(())
     }
 
@@ -202,6 +235,21 @@ impl Resolver {
         Ok(())
     }
 
+    fn resolve_get_expr(&mut self, expr: &Get) -> ResolveResult {
+        self.resolve_expr(&expr.object)?;
+        Ok(())
+    }
+
+    fn resolve_set_expr(&mut self, expr: &Set) -> ResolveResult {
+        self.resolve_expr(&expr.object)?;
+        self.resolve_expr(&expr.value)?;
+        Ok(())
+    }
+
+    fn resolve_this(&mut self, expr: &This) -> ResolveResult {
+        Ok(())
+    }
+
     fn resolve_expr(&mut self, expr: &Expr) -> ResolveResult {
         match expr {
             Expr::Assign(a) => self.resolve_assign_expr(a),
@@ -211,6 +259,9 @@ impl Resolver {
             Expr::Binary(b) => self.resolve_binary_expr(b),
             Expr::Logical(l) => self.resolve_logical_expr(l),
             Expr::Grouping(g) => self.resolve_grouping_expr(g),
+            Expr::Get(g) => self.resolve_get_expr(g),
+            Expr::Set(s) => self.resolve_set_expr(s),
+            Expr::This(t) => self.resolve_this(t),
             Expr::Literal(_) => Ok(()),
         }
     }
@@ -221,11 +272,12 @@ impl Resolver {
             Stmt::Print(p) => self.resolve_expr_stmt(p),
             Stmt::Expresssion(e) => self.resolve_expr_stmt(e),
             Stmt::Block(b) => self.resolve_block_stmt(b),
-            Stmt::FnStmt(f) => self.resolve_fun_stmt(f),
+            Stmt::FnStmt(f) => self.resolve_fun_stmt(f, self.current_function),
             Stmt::IfStmt(i) => self.resolve_if_stmt(i),
             Stmt::ForStmt(f) => self.resolve_for_stmt(f),
             Stmt::WhileStmt(w) => self.resolve_while_stmt(w),
             Stmt::ReturnStmt(r) => self.resolve_return_stmt(r),
+            Stmt::Class(c) => self.resolve_class_stmt(c),
             _ => Ok(()),
         }
     }

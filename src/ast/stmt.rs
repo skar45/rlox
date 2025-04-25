@@ -1,8 +1,8 @@
-use crate::token::{LiteralValue, Token};
+use crate::token::{RloxValue, Token};
 
 use super::expr::Expr;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Stmt {
     Expresssion(ExprStmt),
     Print(ExprStmt),
@@ -13,46 +13,47 @@ pub enum Stmt {
     ForStmt(ForStmt),
     FnStmt(FnStmt),
     ReturnStmt(ReturnStmt),
+    Class(Class),
     BreakStmt(BreakStmt),
     ContStmt(ContStmt),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct VarStmt {
     pub name: Token,
     pub initializer: Expr,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ExprStmt {
     pub expr: Expr,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BlockStmt {
     pub statements: Vec<Stmt>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct IfStmt {
     pub condition: Expr,
     pub then_branch: Box<Stmt>,
     pub else_branch: Option<Box<Stmt>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct WhileStmt {
     pub condition: Expr,
     pub body: Box<Stmt>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ForStmtInitializer {
     VarDecl(VarStmt),
     ExprStmt(ExprStmt),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ForStmt {
     pub initializer: Option<ForStmtInitializer>,
     pub condition: Option<Expr>,
@@ -60,24 +61,31 @@ pub struct ForStmt {
     pub body: Box<Stmt>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct FnStmt {
     pub name: Token,
     pub params: Vec<Token>,
     pub body: Vec<Stmt>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ReturnStmt {
-    pub keyword: Token,
+    pub _keyword: Token,
     pub value: Option<Expr>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BreakStmt {}
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ContStmt {}
+
+#[derive(Clone, Debug)]
+pub struct Class {
+    pub name: Token,
+    pub methods: Vec<FnStmt>,
+    pub params: Vec<Token>,
+}
 
 impl Stmt {
     pub fn var(name: Token, initializer: Option<Expr>) -> Self {
@@ -85,7 +93,7 @@ impl Stmt {
             name,
             initializer: match initializer {
                 Some(v) => v,
-                None => Expr::literal(LiteralValue::Nil),
+                None => Expr::literal(RloxValue::Nil),
             },
         })
     }
@@ -136,6 +144,17 @@ impl Stmt {
     }
 
     pub fn return_stmt(keyword: Token, value: Option<Expr>) -> Self {
-        Stmt::ReturnStmt(ReturnStmt { keyword, value })
+        Stmt::ReturnStmt(ReturnStmt {
+            _keyword: keyword,
+            value,
+        })
+    }
+
+    pub fn class_stmt(name: Token, methods: Vec<FnStmt>, params: Vec<Token>) -> Self {
+        Stmt::Class(Class {
+            name,
+            methods,
+            params,
+        })
     }
 }
