@@ -1,4 +1,4 @@
-use crate::class::RloxInstance;
+use crate::{callable::Callable, class::RloxInstance};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
@@ -77,7 +77,38 @@ pub enum RloxValue {
     Num(f64),
     Bool(bool),
     Instance(RloxInstance),
+    Callable(Callable),
     Nil,
+}
+
+#[derive(Debug, Clone)]
+pub enum LiteralValue {
+    Str(String),
+    Num(f64),
+    Bool(bool),
+    Nil,
+}
+
+impl LiteralValue {
+    pub fn convert(&self) -> RloxValue {
+        match self {
+            LiteralValue::Str(s) => RloxValue::Str(s.clone()),
+            LiteralValue::Num(n) => RloxValue::Num(n.clone()),
+            LiteralValue::Bool(b) => RloxValue::Bool(b.clone()),
+            LiteralValue::Nil => RloxValue::Nil,
+        }
+    }
+}
+
+impl std::fmt::Display for LiteralValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LiteralValue::Str(v) => write!(f, "{}", v),
+            LiteralValue::Num(v) => write!(f, "{}", v),
+            LiteralValue::Bool(v) => write!(f, "{}", v),
+            LiteralValue::Nil => write!(f, "Nil"),
+        }
+    }
 }
 
 impl std::fmt::Display for RloxValue {
@@ -87,7 +118,8 @@ impl std::fmt::Display for RloxValue {
             RloxValue::Num(v) => write!(f, "{}", v),
             RloxValue::Bool(v) => write!(f, "{}", v),
             RloxValue::Nil => write!(f, "Nil"),
-            RloxValue::Instance(i) => write!(f, "{}", i)
+            RloxValue::Instance(i) => write!(f, "{}", i),
+            RloxValue::Callable(c) => write!(f, "{}", c.function.name.lexme),
         }
     }
 }
@@ -96,7 +128,7 @@ impl std::fmt::Display for RloxValue {
 pub struct Token {
     pub r#type: TokenType,
     pub lexme: String,
-    pub literal: Option<RloxValue>,
+    pub literal: Option<LiteralValue>,
     pub line: usize,
     pub column: usize,
 }

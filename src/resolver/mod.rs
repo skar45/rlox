@@ -11,7 +11,6 @@ enum ResolveValue<'a> {
     Var(&'a Variable),
 }
 
-
 impl ResolveValue<'_> {
     fn get_id(&self) -> usize {
         match &self {
@@ -25,13 +24,13 @@ impl ResolveValue<'_> {
 enum FunctionType {
     None,
     Function,
-    Method
+    Method,
 }
 
 pub struct Resolver {
     scopes: Vec<HashMap<String, bool>>,
     current_function: FunctionType,
-    pub locals: HashMap<usize, usize>,
+    pub resolved_locals: HashMap<usize, usize>,
 }
 
 type ResolveResult = Result<(), ResolverError>;
@@ -40,8 +39,8 @@ impl Resolver {
     pub fn new() -> Self {
         Resolver {
             scopes: Vec::new(),
-            locals: HashMap::new(),
-            current_function: FunctionType::None
+            resolved_locals: HashMap::new(),
+            current_function: FunctionType::None,
         }
     }
 
@@ -83,7 +82,7 @@ impl Resolver {
     fn resolve_local(&mut self, value: ResolveValue, name: &Token) {
         for (i, scope) in self.scopes.iter().enumerate().rev() {
             if scope.contains_key(&name.lexme) {
-                self.locals
+                self.resolved_locals
                     .insert(value.get_id(), self.scopes.len() - i - 1);
                 return;
             }
@@ -140,7 +139,7 @@ impl Resolver {
     fn resolve_return_stmt(&mut self, stmt: &ReturnStmt) -> ResolveResult {
         if self.current_function == FunctionType::None {
             return Err(Resolver::var_error(
-                &stmt._keyword,
+                &stmt.keyword,
                 "can't read local variables in its own initializer",
             ));
         }

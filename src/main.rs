@@ -1,4 +1,5 @@
 mod ast;
+mod callable;
 mod class;
 mod environment;
 mod errors;
@@ -7,7 +8,6 @@ mod lexer;
 mod parser;
 mod resolver;
 mod token;
-mod callable;
 
 use std::{
     env, fs,
@@ -48,15 +48,15 @@ impl Rlox {
         if self.had_error {
             process::exit(0x41)
         };
-        // Resolve
+        // // Resolve
         let mut resolver = Resolver::new();
         if let Err(e) = resolver.resolve(&parsed_stmts) {
             self.report_error(&e, line_text[e.get_line()]);
             process::exit(0x41)
         };
-        // Interpret
+        // // Interpret
         let env = Environment::new();
-        let mut interpreter = Interpreter::new(env, resolver.locals);
+        let mut interpreter = Interpreter::new(env, resolver.resolved_locals);
         if let Err(e) = interpreter.interpret(parsed_stmts) {
             self.report_error(&e, line_text[e.get_line()]);
         };

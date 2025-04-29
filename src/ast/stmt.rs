@@ -1,4 +1,4 @@
-use crate::token::{RloxValue, Token};
+use crate::token::{LiteralValue, RloxValue, Token};
 
 use super::expr::Expr;
 
@@ -70,7 +70,7 @@ pub struct FnStmt {
 
 #[derive(Clone, Debug)]
 pub struct ReturnStmt {
-    pub _keyword: Token,
+    pub keyword: Token,
     pub value: Option<Expr>,
 }
 
@@ -93,7 +93,7 @@ impl Stmt {
             name,
             initializer: match initializer {
                 Some(v) => v,
-                None => Expr::literal(RloxValue::Nil),
+                None => Expr::literal(LiteralValue::Nil),
             },
         })
     }
@@ -145,7 +145,7 @@ impl Stmt {
 
     pub fn return_stmt(keyword: Token, value: Option<Expr>) -> Self {
         Stmt::ReturnStmt(ReturnStmt {
-            _keyword: keyword,
+            keyword,
             value,
         })
     }

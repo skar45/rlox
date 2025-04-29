@@ -32,12 +32,12 @@ pub enum Expr {
     Call(Call),
     Get(Get),
     Set(Set),
-    This(This)
+    This(This),
 }
 
 #[derive(Debug, Clone)]
 pub struct Literal {
-    pub value: RloxValue,
+    pub value: LiteralValue,
 }
 
 #[derive(Debug, Clone)]
@@ -80,7 +80,7 @@ pub struct Logical {
 
 #[derive(Debug, Clone)]
 pub struct Call {
-    pub callee: String,
+    pub callee: Box<Expr>,
     pub paren: Token,
     pub args: Vec<Expr>,
 }
@@ -89,6 +89,7 @@ pub struct Call {
 pub struct Get {
     pub object: Box<Expr>,
     pub name: Token,
+    pub method_args: Option<Vec<Expr>>
 }
 
 #[derive(Debug, Clone)]
@@ -120,7 +121,7 @@ impl Expr {
         }
     }
 
-    pub fn literal(literal_type: RloxValue) -> Self {
+    pub fn literal(literal_type: LiteralValue) -> Self {
         Expr::Literal(Literal {
             value: literal_type,
         })
@@ -167,18 +168,19 @@ impl Expr {
         })
     }
 
-    pub fn call(callee: String, paren: Token, args: Vec<Expr>) -> Self {
+    pub fn call(callee: Expr, paren: Token, args: Vec<Expr>) -> Self {
         Expr::Call(Call {
-            callee,
+            callee: Box::new(callee),
             paren,
             args,
         })
     }
 
-    pub fn get(name: Token, object: Expr) -> Self {
+    pub fn get(name: Token, object: Expr, method_args: Option<Vec<Expr>>) -> Self {
         Expr::Get(Get {
             name,
-            object: Box::new(object)
+            method_args,
+            object: Box::new(object),
         })
     }
 
@@ -186,20 +188,18 @@ impl Expr {
         Expr::Set(Set {
             name,
             object: Box::new(object),
-            value: Box::new(value)
+            value: Box::new(value),
         })
     }
 
     pub fn this(keyword: Token) -> Self {
-        Expr::This(This {
-            keyword,
-        })
+        Expr::This(This { keyword })
     }
 }
 
 #[test]
 pub fn liter_expr() {
-    let l = Expr::literal(RloxValue::Num(2.0));
+    let l = Expr::literal(LiteralValue::Num(2.0));
     assert_eq!("2", l.to_string());
 }
 
@@ -219,9 +219,9 @@ pub fn group_expr() {
         lexme: "+".to_string(),
         literal: None,
     };
-    let l1 = Expr::literal(RloxValue::Num(4.0));
-    let l2 = Expr::literal(RloxValue::Num(15.0));
-    let l3 = Expr::literal(RloxValue::Num(9.0));
+    let l1 = Expr::literal(LiteralValue::Num(4.0));
+    let l2 = Expr::literal(LiteralValue::Num(15.0));
+    let l3 = Expr::literal(LiteralValue::Num(9.0));
     let b1 = Expr::binary(l1, multiplication, l2);
     let g = Expr::grouping(b1);
     let b2 = Expr::binary(l3, addition, g);

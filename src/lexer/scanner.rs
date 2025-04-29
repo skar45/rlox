@@ -177,7 +177,7 @@ impl Scanner {
         let value: String = self.source[self.start + 1..self.current - 1]
             .iter()
             .collect();
-        self.add_token_literal(TokenType::String, RloxValue::Str(value));
+        self.add_token_literal(TokenType::String, LiteralValue::Str(value));
         Ok(())
     }
 
@@ -197,7 +197,7 @@ impl Scanner {
             .collect::<String>()
             .parse::<f64>();
         match value {
-            Ok(v) => self.add_token_literal(TokenType::Number, RloxValue::Num(v)),
+            Ok(v) => self.add_token_literal(TokenType::Number, LiteralValue::Num(v)),
             Err(_) => return Err(self.invalid_token(self.source[self.start])),
         }
         Ok(())
@@ -210,9 +210,9 @@ impl Scanner {
         let value: String = self.source[self.start..self.current].iter().collect();
         let token = TokenType::match_token(value.as_str());
         match token {
-            TokenType::True => self.add_token_literal(token, RloxValue::Bool(true)),
-            TokenType::False => self.add_token_literal(token, RloxValue::Bool(false)),
-            TokenType::Nil => self.add_token_literal(token, RloxValue::Nil),
+            TokenType::True => self.add_token_literal(token, LiteralValue::Bool(true)),
+            TokenType::False => self.add_token_literal(token, LiteralValue::Bool(false)),
+            TokenType::Nil => self.add_token_literal(token, LiteralValue::Nil),
             _ => self.add_token(token),
         }
         Ok(())
@@ -295,7 +295,7 @@ impl Scanner {
         });
     }
 
-    fn add_token_literal(&mut self, r#type: TokenType, literal: RloxValue) {
+    fn add_token_literal(&mut self, r#type: TokenType, literal: LiteralValue) {
         let lexme = self.source[self.start..self.current].into_iter().collect();
         self.tokens.push(Token {
             r#type,

@@ -1,24 +1,27 @@
 use std::collections::HashMap;
 
-use crate::{ast::stmt::FnStmt, token::RloxValue};
+use crate::{callable::Callable, token::RloxValue};
 
 #[derive(Debug, Clone)]
 pub struct RloxClass {
     pub name: String,
-    pub methods: HashMap<String, FnStmt>,
+    pub methods: HashMap<String, Callable>,
     pub params: Vec<String>,
 }
 
 impl RloxClass {
-    pub fn new(name: String, methods: HashMap<String, FnStmt>, params: Vec<String>) -> Self {
-        RloxClass { name, methods, params }
+    pub fn new(name: String, methods: HashMap<String, Callable>, params: Vec<String>) -> Self {
+        RloxClass {
+            name,
+            methods,
+            params,
+        }
     }
 
-    pub fn find_method(&self, name: &str) -> Option<&FnStmt> {
+    pub fn find_method(&self, name: &str) -> Option<&Callable> {
         self.methods.get(name)
     }
 }
-
 
 impl std::fmt::Display for RloxClass {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -29,12 +32,12 @@ impl std::fmt::Display for RloxClass {
 #[derive(Debug, Clone)]
 pub struct RloxInstance {
     pub class: RloxClass,
-    pub fields: HashMap<String, RloxValue>
+    pub fields: HashMap<String, RloxValue>,
 }
 
 pub enum FieldType<'a> {
-    Method(&'a FnStmt),
-    Field(&'a RloxValue)
+    Method(&'a Callable),
+    Field(&'a RloxValue),
 }
 
 impl RloxInstance {
@@ -46,13 +49,13 @@ impl RloxInstance {
         RloxInstance { class, fields }
     }
 
-    pub fn get<'a>(&'a self, name: &str) -> Option<FieldType<'a>> {
+    pub fn get(&self, name: &str) -> Option<FieldType> {
         if let Some(f) = self.fields.get(name) {
-            return Some(FieldType::Field(f))
+            return Some(FieldType::Field(f));
         }
 
         if let Some(m) = self.class.find_method(name) {
-            return Some(FieldType::Method(m))
+            return Some(FieldType::Method(m));
         }
 
         None

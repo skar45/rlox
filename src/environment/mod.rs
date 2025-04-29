@@ -53,7 +53,7 @@ impl Environment {
         }
     }
 
-    pub fn assign_at<'a>(
+    pub fn assign_at(
         &mut self,
         distance: usize,
         name: String,
@@ -98,13 +98,13 @@ impl Environment {
         }
     }
 
-    pub fn define_fn(&mut self, name: String, value: FnStmt) {
-        let mut env = self.ctx;
-        unsafe {
-            let mut_env = env.as_mut();
-            mut_env.rlox_funs.insert(name, value);
-        }
-    }
+    // pub fn define_fn(&mut self, name: String, value: FnStmt) {
+        // let mut env = self.ctx;
+        // unsafe {
+            // let mut_env = env.as_mut();
+            // mut_env.rlox_funs.insert(name, value);
+        // }
+    // }
 
     pub fn define_class(&mut self, name: String, value: RloxClass) {
         let mut env = self.ctx;
@@ -130,23 +130,23 @@ impl Environment {
         }
     }
 
-    pub fn get_fn<'a>(&mut self, name: &str) -> Option<&'a FnStmt> {
-        let mut env = self.ctx;
-        unsafe {
-            loop {
-                let mut_env = env.as_mut();
-                match mut_env.rlox_funs.get(name) {
-                    Some(v) => return Some(v),
-                    None => match mut_env.enclosing {
-                        Some(e) => env = e,
-                        None => return None,
-                    },
-                }
-            }
-        }
-    }
+    // pub fn get_fn<'a>(&mut self, name: &str) -> Option<&'a FnStmt> {
+        // let mut env = self.ctx;
+        // unsafe {
+            // loop {
+                // let mut_env = env.as_mut();
+                // match mut_env.rlox_funs.get(name) {
+                    // Some(v) => return Some(v),
+                    // None => match mut_env.enclosing {
+                        // Some(e) => env = e,
+                        // None => return None,
+                    // },
+                // }
+            // }
+        // }
+    // }
 
-    pub fn get_class<'a>(&mut self, name: &str) -> Option<&'a RloxClass> {
+    pub fn get_class(&mut self, name: &str) -> Option<&RloxClass> {
         let mut env = self.ctx;
         unsafe {
             loop {

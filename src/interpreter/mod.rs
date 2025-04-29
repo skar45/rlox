@@ -1,11 +1,7 @@
 use std::{collections::HashMap, mem};
 
 use crate::{
-    ast::{expr::*, stmt::*},
-    class::{FieldType, RloxClass, RloxInstance},
-    environment::Environment,
-    errors::interpreter_errors::RuntimeError,
-    token::{RloxValue, Token, TokenType},
+    ast::{expr::*, stmt::*}, callable::Callable, class::{FieldType, RloxClass, RloxInstance}, environment::Environment, errors::interpreter_errors::RuntimeError, token::{RloxValue, Token, TokenType}
 };
 
 enum ControlFlow {
@@ -25,7 +21,7 @@ impl From<RuntimeError> for RuntimeState {
     }
 }
 
-impl From<ControlFlow> for RuntimeState {
+impl <'a>From<ControlFlow> for RuntimeState {
     fn from(value: ControlFlow) -> Self {
         RuntimeState::Cf(value)
     }
@@ -78,7 +74,7 @@ impl Interpreter {
     }
 
     fn eval_literal(&self, expr: &Literal) -> EvalExprResult {
-        Ok(expr.value.clone())
+        Ok(expr.value.convert())
     }
 
     fn eval_group(&mut self, expr: &Grouping) -> EvalExprResult {
@@ -223,71 +219,96 @@ impl Interpreter {
         }
     }
 
-    fn call(&mut self, args: Vec<RloxValue>, fun_stmt: &FnStmt) -> EvalExprResult {
-            let mut ret_val = RloxValue::Nil;
-            let mut env = Environment::new();
-            env.add_enclosing(&self.current_env);
-            let prev = mem::replace(&mut self.current_env, env);
+    fn call(&mut self, args: &Vec<RloxValue>, callable: &Callable) -> EvalExprResult {
+        let mut ret_val = RloxValue::Nil;
+        let mut env = Environment::new();
+        env.add_enclosing(&self.current_env);
+        let prev = mem::replace(&mut self.current_env, env);
+        let fun_stmt = callable.function.clone();
 
-            for (i, param) in fun_stmt.params.iter().enumerate() {
-                self.current_env
-                    .define_var(param.lexme.clone(), args[i].clone());
-            }
+        for (i, param) in fun_stmt.params.iter().enumerate() {
+            self.current_env
+                .define_var(param.lexme.clone(), args[i].clone());
+        }
 
-            for stmt in &fun_stmt.body {
-                if let Err(e) = self.execute(stmt) {
-                    match e {
-                        RuntimeState::Cf(c) => match c {
-                            ControlFlow::Return(v) => {
-                                ret_val = v;
-                                break;
-                            }
-                            _ => (),
-                        },
-                        _ => return Err(e),
-                    };
+        for stmt in &fun_stmt.body {
+            if let Err(e) = self.execute(stmt) {
+                match e {
+                    RuntimeState::Cf(c) => match c {
+                        ControlFlow::Return(v) => {
+                            ret_val = v;
+                            break;
+                        }
+                        _ => (),
+                    },
+                    _ => return Err(e),
                 };
-            }
-            let _ = mem::replace(&mut self.current_env, prev);
-            return Ok(ret_val);
+            };
+        }
+        self.current_env = prev;
+        return Ok(ret_val);
     }
 
     fn eval_call(&mut self, expr: &Call) -> EvalExprResult {
         let mut args = Vec::new();
+        let name = self.evaluate(&expr.callee)?.to_string();
         for arg in &expr.args {
             args.push(self.evaluate(&arg)?);
         }
 
-        if let Some(fun) = self.current_env.get_fn(&expr.callee) {
-            return self.call(args, fun);
+        if let Some(&ref val) = self.current_env.get_var(&name) {
+            match val {
+                RloxValue::Callable(c) => return self.call(&args, c),
+                _ => {
+                    return Err(self.value_error(
+                        &format!("cannot find function {} in this scope", name),
+                        &expr.paren,
+                    ))
+                }
+            }
         }
 
-        if let Some(class)  = self.current_env.get_class(&expr.callee) {
+        if let Some(class) = self.current_env.get_class(&name) {
             let instance = RloxInstance::new(class.clone(), args);
             return Ok(RloxValue::Instance(instance));
         }
 
         Err(self.value_error(
-            &format!("cannot find function {} in this scope", &expr.callee),
+            &format!("cannot find function {} in this scope", name),
             &expr.paren,
         ))
     }
 
-    fn bind(&mut self, instance: RloxInstance) -> RloxValue {
-        RloxValue::Nil
+    fn call_method(&mut self, instance: &RloxInstance, method: &Callable, method_args: &Option<Vec<Expr>>) -> EvalExprResult {
+        let mut env = Environment::new();
+        env.add_enclosing(&self.current_env);
+        env.define_var("this".to_string(), RloxValue::Instance(instance.clone()));
+        let prev = mem::replace(&mut self.current_env, env);
+        let mut args = Vec::new();
+        if let Some(m_args) = method_args {
+            for arg in m_args {
+                args.push(self.evaluate(&arg)?);
+            }
+        }
+        let ret_val = self.call(&args, method);
+        self.current_env = prev;
+        ret_val
     }
 
     fn eval_get(&mut self, expr: &Get) -> EvalExprResult {
         let object = self.evaluate(&expr.object)?;
+        let args = &expr.method_args;
         match object {
-            RloxValue::Instance(i) => match i.get(&expr.name.lexme) {
-                Some(v) => match v {
-                    FieldType::Field(f) => Ok(f.clone()),
-                    FieldType::Method(m) => Ok(self.bind(i)),
-                },
-                None => return Err(self.value_error("undefined property", &expr.name))
-            },
-            _ => return Err(self.value_error("only instances have properties", &expr.name))
+            RloxValue::Instance(i) => {
+                match i.get(&expr.name.lexme) {
+                    Some(v) => match v {
+                        FieldType::Field(f) => Ok(f.clone()),
+                        FieldType::Method(m) => self.call_method(&i, m, args),
+                    },
+                    None => Err(self.value_error("undefined property", &expr.name)),
+                }
+            }
+            _ => return Err(self.value_error("only instances have properties", &expr.name)),
         }
     }
 
@@ -298,11 +319,10 @@ impl Interpreter {
                 let value = self.evaluate(&expr.value)?;
                 return match i.set(expr.name.lexme.clone(), value) {
                     Some(v) => Ok(v),
-                    None => Err(self.value_error("only instances have properties", &expr.name))
-                }
-                
-            },
-            _ => return Err(self.value_error("only instances have properties", &expr.name))
+                    None => Err(self.value_error("only instances have properties", &expr.name)),
+                };
+            }
+            _ => return Err(self.value_error("only instances have properties", &expr.name)),
         }
     }
 
@@ -318,7 +338,7 @@ impl Interpreter {
             Expr::Call(c) => self.eval_call(c),
             Expr::Get(g) => self.eval_get(g),
             Expr::Set(s) => self.eval_set(s),
-            Expr::This(t) => todo!("this")
+            Expr::This(t) => todo!("this"),
         }
     }
 
@@ -412,8 +432,9 @@ impl Interpreter {
     }
 
     fn declare_fn(&mut self, stmt: &FnStmt) -> EvalStmtResult {
+        let callable = RloxValue::Callable(Callable::new(stmt.clone()));
         self.current_env
-            .define_fn(stmt.name.lexme.clone(), stmt.clone());
+            .define_var(stmt.name.lexme.clone(), callable);
         Ok(())
     }
 
@@ -438,7 +459,8 @@ impl Interpreter {
         let mut methods = HashMap::new();
         let init_params = stmt.params.iter().map(|p| p.lexme.to_string()).collect();
         for method in &stmt.methods {
-            methods.insert(method.name.lexme.clone(), method.clone());
+            let callable = Callable::new(method.clone());
+            methods.insert(method.name.lexme.clone(), callable);
         }
         let rlox_class = RloxClass::new(name.clone(), methods, init_params);
         self.current_env.define_class(name.clone(), rlox_class);
@@ -463,8 +485,8 @@ impl Interpreter {
     }
 
     pub fn interpret(&mut self, statements: Vec<Stmt>) -> Result<(), RuntimeError> {
-        for statement in statements {
-            if let Err(e) = self.execute(&statement) {
+        for statement in &statements {
+            if let Err(e) = self.execute(statement) {
                 match e {
                     RuntimeState::RtErr(e) => return Err(e),
                     _ => (),
