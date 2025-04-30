@@ -12,6 +12,8 @@ const EXPR: &'static str = "./tests/expressions/expressions.rlox";
 const EXPR_RES: &'static str = "./tests/expressions/result";
 const LOOPS: &'static str = "./tests/loops/loops.rlox";
 const LOOPS_RES: &'static str = "./tests/loops/result";
+const CLASS: &'static str = "./tests/class/class.rlox";
+const CLASS_RES: &'static str = "./tests/class/result";
 
 #[test]
 fn test_var_declarations() {
@@ -46,4 +48,11 @@ fn test_loops() {
     let res = fs::read_to_string(LOOPS_RES).unwrap();
     let mut cmd = common::setup();
     cmd.arg(LOOPS).assert().success().stdout(res);
+}
+
+#[test]
+fn test_class() {
+    let res = fs::read_to_string(CLASS_RES).unwrap();
+    let mut cmd = common::setup();
+    cmd.arg(CLASS).assert().success().stdout(res);
 }

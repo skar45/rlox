@@ -80,7 +80,7 @@ pub struct Logical {
 
 #[derive(Debug, Clone)]
 pub struct Call {
-    pub callee: Box<Expr>,
+    pub callee: String,
     pub paren: Token,
     pub args: Vec<Expr>,
 }
@@ -168,9 +168,9 @@ impl Expr {
         })
     }
 
-    pub fn call(callee: Expr, paren: Token, args: Vec<Expr>) -> Self {
+    pub fn call(callee: String, paren: Token, args: Vec<Expr>) -> Self {
         Expr::Call(Call {
-            callee: Box::new(callee),
+            callee,
             paren,
             args,
         })

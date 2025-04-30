@@ -131,6 +131,7 @@ impl Parser {
     }
 
     fn call(&mut self) -> ParseExprResult {
+        let prev = self.peek().lexme.clone();
         let mut expr = self.primary()?;
         loop {
             match self.peek().r#type {
@@ -182,7 +183,7 @@ impl Parser {
                         return Err(self.stmt_error("missing \")\" for function call"));
                     }
                     let paren = self.advance();
-                    expr = Expr::call(expr, paren, args);
+                    expr = Expr::call(prev.clone(), paren, args);
                 }
                 _ => break,
             }
@@ -361,9 +362,6 @@ impl Parser {
             return Err(self.stmt_error("missing \"(\""));
         }
         let condition = self.expression()?;
-        // if self.previous().r#type != TokenType::RightParen {
-            // return Err(self.stmt_error("missing \")\""));
-        // }
         let then_branch = self.statement()?;
         let else_branch = match self.peek().r#type {
             TokenType::Else => {

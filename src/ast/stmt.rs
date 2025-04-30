@@ -1,4 +1,4 @@
-use crate::token::{LiteralValue, RloxValue, Token};
+use crate::token::{LiteralValue, Token};
 
 use super::expr::Expr;
 
@@ -139,9 +139,9 @@ impl Stmt {
         })
     }
 
-    pub fn fn_stmt(name: Token, params: Vec<Token>, body: Vec<Stmt>) -> Self {
-        Stmt::FnStmt(FnStmt { name, params, body })
-    }
+    // pub fn fn_stmt(name: Token, params: Vec<Token>, body: Vec<Stmt>) -> Self {
+        // Stmt::FnStmt(FnStmt { name, params, body })
+    // }
 
     pub fn return_stmt(keyword: Token, value: Option<Expr>) -> Self {
         Stmt::ReturnStmt(ReturnStmt {

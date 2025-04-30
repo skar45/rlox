@@ -224,8 +224,12 @@ impl Interpreter {
         let mut env = Environment::new();
         env.add_enclosing(&self.current_env);
         let prev = mem::replace(&mut self.current_env, env);
-        let fun_stmt = callable.function.clone();
-
+        let fun_stmt = callable.clone().function;
+        let params_len = fun_stmt.params.len();
+        let args_len = args.len();
+        if params_len != args_len {
+            return Err(self.expression_error(format!("this function takes {} args but {} were given", params_len, args_len).as_str(), &callable.function.name))
+        }
         for (i, param) in fun_stmt.params.iter().enumerate() {
             self.current_env
                 .define_var(param.lexme.clone(), args[i].clone());
@@ -251,7 +255,7 @@ impl Interpreter {
 
     fn eval_call(&mut self, expr: &Call) -> EvalExprResult {
         let mut args = Vec::new();
-        let name = self.evaluate(&expr.callee)?.to_string();
+        let name = expr.callee.clone();
         for arg in &expr.args {
             args.push(self.evaluate(&arg)?);
         }
@@ -303,7 +307,7 @@ impl Interpreter {
                 match i.get(&expr.name.lexme) {
                     Some(v) => match v {
                         FieldType::Field(f) => Ok(f.clone()),
-                        FieldType::Method(m) => self.call_method(&i, m, args),
+                        FieldType::Method(m) => self.call_method(&i, &m, args),
                     },
                     None => Err(self.value_error("undefined property", &expr.name)),
                 }
@@ -326,6 +330,13 @@ impl Interpreter {
         }
     }
 
+    fn eval_this(&mut self, expr: &This) -> EvalExprResult {
+        match self.current_env.get_var("this") {
+            Some(v) => Ok(v.clone()),
+            None => Err(self.value_error("only instances have properties", &expr.keyword))
+        }
+    }
+
     fn evaluate(&mut self, expr: &Expr) -> EvalExprResult {
         match expr {
             Expr::Literal(l) => self.eval_literal(l),
@@ -338,7 +349,7 @@ impl Interpreter {
             Expr::Call(c) => self.eval_call(c),
             Expr::Get(g) => self.eval_get(g),
             Expr::Set(s) => self.eval_set(s),
-            Expr::This(t) => todo!("this"),
+            Expr::This(t) => self.eval_this(t)
         }
     }
 

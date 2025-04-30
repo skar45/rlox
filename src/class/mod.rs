@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{callable::Callable, token::RloxValue};
 
@@ -29,15 +29,20 @@ impl std::fmt::Display for RloxClass {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct RloxInstance {
+#[derive(Debug)]
+struct ClassCtx {
     pub class: RloxClass,
     pub fields: HashMap<String, RloxValue>,
 }
 
-pub enum FieldType<'a> {
-    Method(&'a Callable),
-    Field(&'a RloxValue),
+#[derive(Debug)]
+pub struct RloxInstance {
+    ctx: Rc<RefCell<ClassCtx>>
+}
+
+pub enum FieldType {
+    Method(Callable),
+    Field(RloxValue),
 }
 
 impl RloxInstance {
@@ -46,28 +51,39 @@ impl RloxInstance {
         for (i, arg) in args.into_iter().enumerate() {
             fields.insert(class.params[i].to_string(), arg);
         }
-        RloxInstance { class, fields }
+        let ctx = ClassCtx { class, fields };
+        RloxInstance { ctx: Rc::new(RefCell::new(ctx)) }
     }
 
     pub fn get(&self, name: &str) -> Option<FieldType> {
-        if let Some(f) = self.fields.get(name) {
-            return Some(FieldType::Field(f));
+        let ctx = self.ctx.borrow();
+        if let Some(f) = ctx.fields.get(name) {
+            return Some(FieldType::Field(f.clone()));
         }
 
-        if let Some(m) = self.class.find_method(name) {
-            return Some(FieldType::Method(m));
+        if let Some(m) = ctx.class.find_method(name) {
+            return Some(FieldType::Method(m.clone()));
         }
 
         None
     }
 
     pub fn set(&mut self, name: String, value: RloxValue) -> Option<RloxValue> {
-        self.fields.insert(name, value)
+        let mut ctx = self.ctx.borrow_mut();
+        ctx.fields.insert(name, value)
     }
 }
 
 impl std::fmt::Display for RloxInstance {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} instance", self.class.name)
+        write!(f, "{} instance", self.ctx.borrow().class.name)
     }
 }
+
+impl Clone for RloxInstance {
+    fn clone(&self) -> Self {
+        RloxInstance { ctx: self.ctx.clone() }
+    }
+}
+
+

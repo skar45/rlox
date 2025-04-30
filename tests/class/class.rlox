@@ -1,0 +1,30 @@
+class Foo(a, b ,c) {
+    fun printVal(d) {
+	print this.a + d;
+	print this.b + this.a;
+    }
+
+    fun set_a(a) {
+	this.a = a;
+	this.b = a;
+	var test = 1;
+    }
+}
+
+class Bar(baz);
+
+var inst = Foo(6, 2, 3);
+var inst2 = Foo(1, 3, inst);
+inst.printVal(4);
+
+print inst.a;
+inst.a = 1;
+print inst.a;
+
+print inst2.c.a;
+inst2.set_a(0);
+print inst2.a;
+print inst2.b;
+
+var inst3 = Bar("test");
+print inst3.baz;

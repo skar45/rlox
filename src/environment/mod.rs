@@ -1,6 +1,6 @@
 use std::{collections::HashMap, ptr::NonNull};
 
-use crate::{ast::stmt::FnStmt, class::RloxClass, token::RloxValue};
+use crate::{class::RloxClass, token::RloxValue};
 
 pub type NonNullCtx = NonNull<EnvCtx>;
 
@@ -10,7 +10,6 @@ pub struct Environment {
 
 pub struct EnvCtx {
     rlox_vars: HashMap<String, RloxValue>,
-    rlox_funs: HashMap<String, FnStmt>,
     rlox_classes: HashMap<String, RloxClass>,
     pub enclosing: Option<NonNullCtx>,
 }
@@ -20,7 +19,6 @@ impl Environment {
         let ctx = unsafe {
             NonNull::new_unchecked(Box::into_raw(Box::new(EnvCtx {
                 rlox_vars: HashMap::new(),
-                rlox_funs: HashMap::new(),
                 rlox_classes: HashMap::new(),
                 enclosing: None,
             })))
@@ -98,14 +96,6 @@ impl Environment {
         }
     }
 
-    // pub fn define_fn(&mut self, name: String, value: FnStmt) {
-        // let mut env = self.ctx;
-        // unsafe {
-            // let mut_env = env.as_mut();
-            // mut_env.rlox_funs.insert(name, value);
-        // }
-    // }
-
     pub fn define_class(&mut self, name: String, value: RloxClass) {
         let mut env = self.ctx;
         unsafe {
@@ -129,22 +119,6 @@ impl Environment {
             }
         }
     }
-
-    // pub fn get_fn<'a>(&mut self, name: &str) -> Option<&'a FnStmt> {
-        // let mut env = self.ctx;
-        // unsafe {
-            // loop {
-                // let mut_env = env.as_mut();
-                // match mut_env.rlox_funs.get(name) {
-                    // Some(v) => return Some(v),
-                    // None => match mut_env.enclosing {
-                        // Some(e) => env = e,
-                        // None => return None,
-                    // },
-                // }
-            // }
-        // }
-    // }
 
     pub fn get_class(&mut self, name: &str) -> Option<&RloxClass> {
         let mut env = self.ctx;
